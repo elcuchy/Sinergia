@@ -2,7 +2,7 @@
 
 sudo pacman -S sudo pacman -S gnome gnome-tweaks --noconfirm
 
-sudo pacman -S gdm gnome-characters gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell grilo-plugins gvfs gvfs-afc gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb nautilus gnome-terminal pacman-contrib amd-ucode intel-ucode okular vlc qbittorrent ark unrar p7zip grub-customizer firefox firefox-i18n-es-ar kdenlive obs-studio audacity libreoffice-fresh-es hunspell-es_uy telegram-desktop audacious gimp zsh zsh-completions --noconfirm
+sudo pacman -S gdm gnome-characters gnome-backgrounds gnome-calculator gnome-calendar gnome-clocks gnome-connections gnome-console gnome-contacts gnome-font-viewer gnome-logs gnome-maps gnome-music gnome-remote-desktop gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell gnome-shell-extensions gnome-system-monitor gnome-text-editor gnome-user-docs gnome-user-share gnome-weather gvfs-dnssd gvfs-wsdd loupe malcontent rygel simple-scan snapshot sushi tecla totem tracker3-miners xdg-desktop-portal xdg-user-dirs-gtk yelp baobab evince  grilo-plugins gvfs gvfs-afc gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb nautilus gnome-terminal-transparency pacman-contrib amd-ucode intel-ucode okular vlc qbittorrent ark unrar p7zip grub-customizer firefox firefox-i18n-es-ar kdenlive obs-studio audacity libreoffice-fresh-es hunspell-es_uy telegram-desktop audacious gimp zsh zsh-completions --noconfirm
 
 git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm && cd ..
 
