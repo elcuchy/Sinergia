@@ -1,52 +1,27 @@
-# Instalación de KDE Plasma en Arch Linux
+# Instalación de GNOME mínimo en Arch Linux
 
-Este script permite una instalación rápida y sencilla de KDE Plasma en Arch Linux.
+Este script instala el entorno de escritorio GNOME junto con una serie de paquetes útiles y extensiones para mejorar la experiencia en Arch Linux. Además, configura algunos parámetros del sistema como la habilitación de gdm (el gestor de sesiones) y la configuración de GRUB.
 
-## Programas Instalados
+## Descripción
 
-El script instala los siguientes paquetes:
+Este script automatiza el proceso de instalación y configuración de GNOME y varios paquetes adicionales en un sistema Arch Linux. Instala tanto aplicaciones de GNOME como otras herramientas útiles para el sistema, optimizando la configuración del mismo para un entorno de usuario cómodo y completo.
 
-- **KDE Plasma y componentes**:
-  - `plasma-desktop`
-  - `plasma-pa` (control de volumen)
-  - `powerdevil` (gestor de energía)
-  - `plasma-nm` (gestor de redes)
-  - `kscreen` (gestor de pantallas)
-  - `sddm` (gestor de inicio de sesión)
+### Paquetes Instalados
 
-- **Aplicaciones adicionales**:
-  - `kwalletmanager`
-  - `kdeplasma-addons`
-  - `spectacle` (captura de pantalla)
-  - `dolphin` (explorador de archivos)
-  - `konsole` (terminal)
-  - `gwenview` (visor de imágenes)
-  - `kate` (editor de texto)
-  - `okular` (visor de documentos)
-  - `vlc` (reproductor multimedia)
-  - `audacious` (reproductor de música)
-  - `gimp` (editor de imágenes)
-  - `qbittorrent` (cliente torrent)
-  - `ark` (gestor de archivos comprimidos)
-  - `unrar`, `p7zip`, `partitionmanager`, `plasma-systemmonitor`, `kcalc`, `kde-gtk-config`, `breeze-gtk`
-  - `plasma-framework5`, `kinfocenter`, `grub-customizer`
-  - Navegadores y aplicaciones de comunicación: `firefox`, `telegram-desktop`
-  - Herramientas de edición: `kdenlive`, `obs-studio`, `audacity`, `libreoffice-fresh-es`
+1. GNOME: Shell, Tweaks, Control Center, Terminal, Nautilus, y más.
+2. Aplicaciones: VLC, Firefox, LibreOffice, Audacity, Gimp, Telegram, y otras.
+3. Herramientas del Sistema: Stacer, Alacritty, y más.
+4. Extensiones de GNOME: Dash to Dock, Magic Lamp, Arc Menu, entre otras.
 
-- **Características adicionales**:
-  - Cartera de KDE Plasma desactivada por defecto
-  - Detecta otro sistema instalado; se descomenta la línea `#GRUB_DISABLE_OS_PROBER=false`
-  - Compatible con sistemas de archivos NTFS
 
-## Uso
+## Instrucciones de Uso
 
-1. Clona el repositorio.
-2. Ejecuta el script
-3. ¡Disfruta de tu entorno KDE Plasma!
+
+    Clona el repositorio.
+    Ejecuta el script
+    ¡Disfruta de tu entorno GNOME!
+
 
 ## Contribuciones
 
-Si deseas contribuir, siéntete libre de hacer un fork del repositorio y enviar un pull request.
-
-
-
+¡Las contribuciones son bienvenidas! Si deseas mejorar el script!
