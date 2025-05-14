@@ -9,15 +9,10 @@ sudo pacman -S sudo pacman -S tde-meta --noconfirm
 
 sudo pacman -S amd-ucode intel-ucode okular vlc  ark unrar p7zip grub-customizer sudo chromium firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop zsh zsh-completions neofetch --noconfirm
 
-git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm && cd ..
-
-yay -S stacer-bin --noconfirm
 sudo pacman -S ntfs-3g os-prober --noconfirm
 sudo sed -i.bak "63s/.*/GRUB_DISABLE_OS_PROBER="false"/" /etc/default/grub
 
 rm -rf ~/LinuxScripts
-
-
 
 sudo systemctl enable tdm.service
 
