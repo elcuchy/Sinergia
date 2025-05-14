@@ -7,7 +7,7 @@ sudo pacman -S sudo pacman -Sy --noconfirm
 
 sudo pacman -S sudo pacman -S tde-meta --noconfirm
 
-sudo pacman -S amd-ucode intel-ucode okular vlc  ark unrar p7zip grub-customizer sudo chromium firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop zsh zsh-completions --noconfirm
+sudo pacman -S amd-ucode intel-ucode okular vlc  ark unrar p7zip grub-customizer sudo chromium firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop zsh zsh-completions neofetch --noconfirm
 
 git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm && cd ..
 
