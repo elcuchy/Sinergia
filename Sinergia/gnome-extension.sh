@@ -102,7 +102,7 @@ rm -rf gnome-shell-extension-astra-monitor
 
 # Instalación del resto de paquetes desde AUR/Chaotic
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-compiz-windows-effect-git gnome-shell-extension-arc-menu-git archlinux-tweak-tool-git --noconfirm
+yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-arc-menu-git gnome-shell-extension-burn-my-windows gnome-shell-extension-coverflow-alt-tab gnome-shell-extension-desktop-cube --noconfirm
 
 
 # ==========================================
