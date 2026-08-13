@@ -1,21 +1,48 @@
- #! /bin/bash
-sudo pacman -S sudo pacman-key --recv-key  D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B --noconfirm
+#!/bin/bash
 
-sudo pacman -S sudo pacman-key --lsign-key  D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B --noconfirm
+# Exit on error (si un comando falla, el script se detiene por seguridad)
+set -e
 
-sudo pacman -S sudo pacman -Sy --noconfirm
+# 1. Recibir y firmar la llave GPG
+sudo pacman-key --recv-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
+sudo pacman-key --lsign-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
 
-sudo pacman -S sudo pacman -S tde-meta --noconfirm
+# 2. Actualizar las bases de datos de repositorios
+sudo pacman -Sy --noconfirm
 
-sudo pacman -S amd-ucode intel-ucode okular vlc  ark unrar p7zip grub-customizer sudo chromium firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop zsh zsh-completions neofetch --noconfirm
+# 3. Instalar TDE y el resto de los paquetes en un solo comando
+sudo pacman -S --noconfirm \
+  tde-meta \
+  amd-ucode \
+  intel-ucode \
+  okular \
+  vlc \
+  ark \
+  unrar \
+  p7zip \
+  grub-customizer \
+  chromium \
+  firefox \
+  firefox-i18n-es-ar \
+  libreoffice-fresh-es \
+  hunspell-es_uy \
+  telegram-desktop \
+  zsh \
+  zsh-completions \
+  fastfetch \
+  ntfs-3g \
+  os-prober
 
-sudo pacman -S ntfs-3g os-prober --noconfirm
-sudo sed -i.bak "63s/.*/GRUB_DISABLE_OS_PROBER="false"/" /etc/default/grub
+# 4. Configurar GRUB para detectar otros sistemas operativos
+sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-rm -rf ~/LinuxScripts
-
+# 5. Habilitar el gestor de inicio de TDE
 sudo systemctl enable tdm.service
 
-grub-mkconfig -o /boot/grub/grub.cfg
+# 6. Limpieza opcional
+rm -rf ~/LinuxScripts
 
-reboot
+# 7. Reiniciar
+echo "Instalación completada. Reiniciando el sistema..."
+sudo reboot
