@@ -1,3 +1,5 @@
+Bash
+
 #!/bin/bash
 
 # ==========================================
@@ -72,18 +74,17 @@ sudo pacman -Sy
 echo "==> Instalando entorno GNOME y aplicaciones..."
 sudo pacman -S gnome-shell gnome-tweaks --noconfirm
 
-sudo pacman -S gdm gnome-characters gnome-backgrounds gnome-calendar gnome-clocks gnome-connections gnome-font-viewer gnome-logs gnome-maps gnome-remote-desktop gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell-extensions gnome-system-monitor gnome-text-editor gnome-user-docs gnome-user-share gvfs-dnssd gvfs-wsdd loupe alacritty rygel sushi tecla tracker3-miners xdg-desktop-portal xdg-user-dirs-gtk yelp baobab evince grilo-plugins gvfs gvfs-afc gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb nautilus pacman-contrib gnome-browser-connector amd-ucode intel-ucode vlc qbittorrent ark unrar p7zip firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop fastfetch-git archlinux-tweak-tool-gtk4 pamac-aur gnome-shell-extension-compiz-windows-effect-git gnome-shell-extension-arch-update gnome-shell-extension-dash-to-dock gnome-terminal-transparency --noconfirm
+sudo pacman -S gdm gnome-characters gnome-backgrounds gnome-calendar gnome-clocks gnome-connections gnome-font-viewer gnome-logs gnome-maps gnome-remote-desktop gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell-extensions gnome-system-monitor gnome-text-editor gnome-user-docs gnome-user-share gvfs-dnssd gvfs-wsdd loupe alacritty rygel sushi tecla tracker3-miners xdg-desktop-portal xdg-user-dirs-gtk yelp baobab evince grilo-plugins gvfs gvfs-afc gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb nautilus gnome-terminal pacman-contrib gnome-browser-connector amd-ucode intel-ucode vlc qbittorrent ark unrar p7zip firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop fastfetch archlinux-tweak-tool-gtk4 --noconfirm
 
 sudo pacman -S ntfs-3g os-prober --noconfirm
 
 
 # ==========================================
-# 5. COMPILACIÓN E INSTALACIÓN DESDE AUR (YAY Y ASTRA MONITOR)
+# 5. INSTALACIÓN DE YAY Y PAQUETES AUR
 # ==========================================
 echo "==> Asegurando base-devel e instalando YAY..."
 sudo pacman -S --needed base-devel git --noconfirm
 
-# Instalación de YAY
 rm -rf yay
 git clone https://aur.archlinux.org/yay.git
 cd yay || exit
@@ -91,9 +92,8 @@ makepkg -si --noconfirm
 cd ..
 rm -rf yay
 
-# Instalación del resto de paquetes desde AUR/Chaotic
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-arc-menu-git gnome-shell-extension-burn-my-windows gnome-shell-extension-coverflow-alt-tab gnome-shell-extension-desktop-cube gnome-shell-extension-astra-monitor --noconfirm
+yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-compiz-windows-effect-git gnome-shell-extension-arc-menu-git  --noconfirm
 
 
 # ==========================================
@@ -102,7 +102,7 @@ yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-com
 echo "==> Habilitando os-prober en GRUB..."
 sudo sed -i.bak "63s/.*/GRUB_DISABLE_OS_PROBER=\"false\"/" /etc/default/grub
 
-echo "==> Limpiando carpeta del script..."
+echo "==> LimPIANDO carpeta del script..."
 rm -rf ~/LinuxScripts
 
 echo "==> Habilitando servicio GDM..."
