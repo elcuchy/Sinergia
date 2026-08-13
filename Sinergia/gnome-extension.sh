@@ -91,18 +91,63 @@ makepkg -si --noconfirm
 cd ..
 rm -rf yay
 
-# Instalación manual de Astra Monitor
-echo "==> Compilando e instalando gnome-shell-extension-astra-monitor..."
-rm -rf gnome-shell-extension-astra-monitor
-git clone https://aur.archlinux.org/gnome-shell-extension-astra-monitor.git
-cd gnome-shell-extension-astra-monitor || exit
-makepkg -si --noconfirm
-cd ..
-rm -rf gnome-shell-extension-astra-monitor
+# Lista de extensiones del AUR a compilar e instalar
+EXTENSIONES=(
+  "gnome-shell-extension-astra-monitor"
+  "gnome-shell-extension-dash-to-dock"
+  "gnome-shell-extension-compiz-alike-magic-lamp-effect-git"
+  "gnome-shell-extension-arc-menu-git"
+  "gnome-shell-extension-burn-my-windows"
+  "gnome-shell-extension-coverflow-alt-tab"
+  "gnome-shell-extension-desktop-cube"
+)
+
+echo "==> Iniciando instalación masiva de extensiones GNOME..."
+echo "----------------------------------------------------"
+
+# 1. Bucle para clonar, compilar e instalar cada paquete del AUR
+for ext in "${EXTENSIONES[@]}"; do
+  echo "==> Procesando: $ext..."
+  
+  # Limpieza previa por si existe la carpeta
+  rm -rf "$ext"
+  
+  if git clone "https://aur.archlinux.org/${ext}.git"; then
+    cd "$ext" || exit 1
+    makepkg -si --noconfirm
+    cd ..
+    rm -rf "$ext"
+    echo "✔ $ext compilada e instalada con éxito."
+  else
+    echo "✖ Error al clonar $ext de la AUR."
+  fi
+  
+  echo "----------------------------------------------------"
+done
+
+# 2. Habilitar automáticamente todas las extensiones instaladas
+echo "==> Activando extensiones en GNOME Shell..."
+
+EXTENSION_IDS=(
+  "astra-monitor@astra-monitor"
+  "dash-to-dock@micxgx.gmail.com"
+  "compiz-alike-magic-lamp-effect@hermes83.github.com"
+  "arcmenu@arcmenu.com"
+  "burn-my-windows@schneegans.github.com"
+  "CoverflowAltTab@palacaze.fr"
+  "desktop-cube@johannesjo.github.com"
+)
+
+for id in "${EXTENSION_IDS[@]}"; do
+  gnome-extensions enable "$id" 2>/dev/null && echo "✔ Activada: $id" || echo "⚠ No se pudo activar automáticamente: $id"
+done
+
+echo "----------------------------------------------------"
+echo "==> ¡Proceso finalizado!"
 
 # Instalación del resto de paquetes desde AUR/Chaotic
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-arc-menu-git gnome-shell-extension-burn-my-windows gnome-shell-extension-coverflow-alt-tab gnome-shell-extension-desktop-cube --noconfirm
+yay -S stacer-bin --noconfirm
 
 
 # ==========================================
