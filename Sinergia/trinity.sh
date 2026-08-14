@@ -20,7 +20,6 @@ sudo pacman -S --noconfirm \
   ark \
   unrar \
   p7zip \
-  grub-customizer \
   chromium \
   firefox \
   firefox-i18n-es-ar \
