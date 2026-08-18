@@ -109,7 +109,7 @@ echo "==> Aplicando personalización de GNOME..."
 # 6.1 Activar Modo Oscuro y Color de Énfasis Verde
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
-gsettings set org.gnome.desktop.interface accent-color 'green'
+
 
 # 6.2 Aplicar tema de íconos yaru-MATE
 gsettings set org.gnome.desktop.interface icon-theme 'Yaru-MATE'
