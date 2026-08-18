@@ -1,14 +1,23 @@
-Bash
-
 #!/bin/bash
 
 # ==========================================
-# 1. CONFIGURACIÓN DE RESPALDO
+# 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
 # ==========================================
 if [ ! -f /etc/pacman.conf.bak_repos ]; then
     echo "==> Creando respaldo de /etc/pacman.conf..."
     sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
 fi
+
+# Agregar ILoveCandy y habilitar ParallelDownloads si no existen
+echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
+if ! grep -q "ILoveCandy" /etc/pacman.conf; then
+    sudo sed -i '/#Misc options/a ILoveCandy' /etc/pacman.conf
+fi
+
+if grep -q "#ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i 's/#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
+fi
+
 
 # ==========================================
 # 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
@@ -44,16 +53,13 @@ sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /et
 # ==========================================
 echo "==> Configurando el repositorio Chaotic-AUR..."
 
-# 3.1 Recibir y firmar clave primaria de Chaotic-AUR
 sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
 sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
 sudo pacman-key --lsign-key 3056513887B78AEB
 
-# 3.2 Instalar los paquetes del llavero y lista de espejos de Chaotic-AUR
 sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
 sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
 
-# 3.3 Añadir la sección de Chaotic-AUR a pacman.conf si no existe
 if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
     echo "==> Agregando [chaotic-aur] a pacman.conf..."
     sudo bash -c 'cat << EOF >> /etc/pacman.conf
@@ -63,7 +69,6 @@ Include = /etc/pacman.d/chaotic-mirrorlist
 EOF'
 fi
 
-# 3.4 Sincronizar todos los repositorios agregados
 echo "==> Actualizando la base de datos de repositorios..."
 sudo pacman -Sy
 
@@ -74,7 +79,7 @@ sudo pacman -Sy
 echo "==> Instalando entorno GNOME y aplicaciones..."
 sudo pacman -S gnome-shell gnome-tweaks --noconfirm
 
-sudo pacman -S gdm gnome-characters gnome-backgrounds gnome-calendar gnome-clocks gnome-connections gnome-font-viewer gnome-logs gnome-maps gnome-remote-desktop gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell-extensions gnome-system-monitor gnome-text-editor gnome-user-docs gnome-user-share gvfs-dnssd gvfs-wsdd loupe alacritty rygel sushi tecla tracker3-miners xdg-desktop-portal xdg-user-dirs-gtk yelp baobab evince grilo-plugins gvfs gvfs-afc gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb nautilus gnome-terminal-transparency pacman-contrib gnome-browser-connector amd-ucode intel-ucode vlc qbittorrent ark unrar p7zip firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop fastfetch archlinux-tweak-tool-gtk4 gnome-shell-extension-arch-update gnome-shell-extension-dash-to-dock pamac-aur ttf-firacode-nerd gedit hardinfo2 gnome-boxes okular decibels snapshot gnome-font-viewer mpv obs-studio audacious audacity ardour gparted kdenlive ventoy btop papirus-icon-theme nano --noconfirm
+sudo pacman -S gdm gnome-characters gnome-backgrounds gnome-calendar gnome-clocks gnome-connections gnome-font-viewer gnome-logs gnome-maps gnome-remote-desktop gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell-extensions gnome-system-monitor gnome-text-editor gnome-user-docs gnome-user-share gvfs-dnssd gvfs-wsdd loupe alacritty rygel sushi tecla tracker3-miners xdg-desktop-portal xdg-user-dirs-gtk yelp baobab evince grilo-plugins gvfs gvfs-afc gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb nautilus gnome-terminal-transparency pacman-contrib gnome-browser-connector amd-ucode intel-ucode vlc qbittorrent ark unrar p7zip firefox firefox-i18n-es-ar libreoffice-fresh-es hunspell-es_uy telegram-desktop fastfetch archlinux-tweak-tool-gtk4 gnome-shell-extension-arch-update gnome-shell-extension-dash-to-dock pamac-aur ttf-firacode-nerd gedit hardinfo2 gnome-boxes okular decibels snapshot gnome-font-viewer mpv obs-studio audacious audacity ardour gparted kdenlive ventoy btop papirus-icon-theme nano dconf-editor --noconfirm
 
 sudo pacman -S ntfs-3g os-prober --noconfirm
 
@@ -93,16 +98,58 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-compiz-windows-effect-git gnome-shell-extension-arc-menu-git gnome-shell-extension-astra-monitor gnome-shell-extension-burn-my-windows gnome-shell-extension-coverflow-alt-tab-git sinergia-dd-burner aimp iptvnator-bin  yaru-colors-icon-theme --noconfirm
+yay -S stacer-bin gnome-shell-extension-dash2dock-lite gnome-shell-extension-compiz-alike-magic-lamp-effect-git gnome-shell-extension-compiz-windows-effect-git gnome-shell-extension-arc-menu-git gnome-shell-extension-astra-monitor gnome-shell-extension-burn-my-windows gnome-shell-extension-coverflow-alt-tab-git sinergia-dd-burner aimp iptvnator-bin yaru-colors-icon-theme --noconfirm
 
 
 # ==========================================
-# 6. CONFIGURACIÓN DEL SISTEMA Y GRUB
+# 6. PERSONALIZACIÓN DE GNOME Y CONFIGURACIONES
+# ==========================================
+echo "==> Aplicando personalización de GNOME..."
+
+# 6.1 Activar Modo Oscuro
+gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
+
+# 6.2 Aplicar tema de íconos yaru-MATE
+gsettings set org.gnome.desktop.interface icon-theme 'Yaru-MATE'
+
+# 6.3 Mostrar botones de Minimizar, Maximizar y Cerrar en las ventanas
+gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
+
+# 6.4 Activar transparencia por defecto en GNOME Terminal
+PROFILE_ID=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+if [ -n "$PROFILE_ID" ]; then
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ use-theme-transparent-background false
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ use-transparent-background true
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ background-transparency-percent 15
+fi
+
+# 6.5 Habilitar extensiones de GNOME por defecto
+EXTENSIONS=(
+    "magic-lamp-effect@hermes83.github.com"
+    "compiz-windows-effect@hermes83.github.com"
+    "arcmenu@arcmenu.com"
+    "AstraMonitor@AstraMonitor"
+    "burn-my-windows@schneegans.github.com"
+    "CoverflowAltTab@palatis.blogspot.com"
+    "arch-update@RaphaelRochet"
+    "dash-to-dock@micxgx.gmail.com"
+)
+
+# Convertir la lista a formato array de dconf/gsettings
+EXT_LIST=$(printf "'%s', " "${EXTENSIONS[@]}")
+EXT_LIST="[${EXT_LIST%, }]"
+
+gsettings set org.gnome.shell enabled-extensions "$EXT_LIST"
+
+
+# ==========================================
+# 7. CONFIGURACIÓN DEL SISTEMA Y GRUB
 # ==========================================
 echo "==> Habilitando os-prober en GRUB..."
 sudo sed -i.bak "63s/.*/GRUB_DISABLE_OS_PROBER=\"false\"/" /etc/default/grub
 
-echo "==> LimPIANDO carpeta del script..."
+echo "==> Limpiando carpeta del script..."
 rm -rf ~/LinuxScripts
 
 echo "==> Habilitando servicio GDM..."
