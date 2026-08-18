@@ -153,6 +153,13 @@ EOF'
 # Actualizar base de datos del sistema dconf
 sudo dconf update
 
+# Activar transparencia por defecto en GNOME Terminal
+PROFILE_ID=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+if [ -n "$PROFILE_ID" ]; then
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ use-theme-transparent-background false
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ use-transparent-background true
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE_ID/ background-transparency-percent 15
+fi
 
 # ==========================================
 # 7. CONFIGURACIÓN DEL SISTEMA Y GRUB
