@@ -142,6 +142,10 @@ EXT_LIST="[${EXT_LIST%, }]"
 
 gsettings set org.gnome.shell enabled-extensions "$EXT_LIST"
 
+# Dash to Dock: Tamaño de íconos a 28px y opacidad dinámica
+gsettings set org.gnome.shell.extensions.dash-to-dock icon-size-fixed true
+gsettings set org.gnome.shell.extensions.dash-to-dock dash-max-icon-size 28
+gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode 'DYNAMIC'
 
 # ==========================================
 # 7. CONFIGURACIÓN DEL SISTEMA Y GRUB
