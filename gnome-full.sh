@@ -8,14 +8,17 @@ if [ ! -f /etc/pacman.conf.bak_repos ]; then
     sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
 fi
 
-# Agregar ILoveCandy y habilitar ParallelDownloads si no existen
+# Agregar ILoveCandy y habilitar ParallelDownloads si no existen (CORREGIDO)
 echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
-if ! grep -q "ILoveCandy" /etc/pacman.conf; then
-    sudo sed -i '/#Misc options/a ILoveCandy' /etc/pacman.conf
+if ! grep -q "^ILoveCandy" /etc/pacman.conf; then
+    # Inserta ILoveCandy justo debajo de la cabecera [options]
+    sudo sed -i '/^\[options\]/a ILoveCandy' /etc/pacman.conf
 fi
 
-if grep -q "#ParallelDownloads" /etc/pacman.conf; then
-    sudo sed -i 's/#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
+if grep -q "^#ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i 's/^#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
+elif ! grep -q "^ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 fi
 
 
