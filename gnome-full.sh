@@ -142,10 +142,54 @@ EXT_LIST="[${EXT_LIST%, }]"
 
 gsettings set org.gnome.shell enabled-extensions "$EXT_LIST"
 
+
+
+# ArcMenu: Atajo Ctrl+Espacio e icono de Arch en celeste
+gsettings set org.gnome.shell.extensions.arcmenu menu-shortcut "['<Control>space']"
+gsettings set org.gnome.shell.extensions.arcmenu custom-menu-button-icon-name 'arch-linux-symbolic'
+gsettings set org.gnome.shell.extensions.arcmenu arc-menu-icon 'arch-linux-symbolic'
+gsettings set org.gnome.shell.extensions.arcmenu override-menu-button-color true
+gsettings set org.gnome.shell.extensions.arcmenu menu-button-color 'rgb(0,186,255)'
+
 # Dash to Dock: Tamaño de íconos a 28px y opacidad dinámica
 gsettings set org.gnome.shell.extensions.dash-to-dock icon-size-fixed true
 gsettings set org.gnome.shell.extensions.dash-to-dock dash-max-icon-size 28
 gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode 'DYNAMIC'
+
+# Burn My Windows: Únicamente el efecto Hexágono activo
+gsettings set org.gnome.shell.extensions.burn-my-windows active-profile ''
+gsettings set org.gnome.shell.extensions.burn-my-windows open-window-effect 'hexagon.glsl'
+gsettings set org.gnome.shell.extensions.burn-my-windows close-window-effect 'hexagon.glsl'
+
+# Guardar ajustes por defecto en dconf del sistema (Garantiza que persistan)
+sudo mkdir -p /etc/dconf/db/local.d/
+sudo bash -c 'cat << EOF > /etc/dconf/db/local.d/00-custom-gnome
+[org/gnome/desktop/interface]
+color-scheme="prefer-dark"
+accent-color="green"
+icon-theme="Yaru-MATE"
+
+[org/gnome/desktop/wm/preferences]
+button-layout="appmenu:minimize,maximize,close"
+
+[org/gnome/shell/extensions/arcmenu]
+menu-shortcut=["<Control>space"]
+custom-menu-button-icon-name="arch-linux-symbolic"
+arc-menu-icon="arch-linux-symbolic"
+override-menu-button-color=true
+menu-button-color="rgb(0,186,255)"
+
+[org/gnome/shell/extensions/dash-to-dock]
+dash-max-icon-size=28
+icon-size-fixed=true
+transparency-mode="DYNAMIC"
+
+[org/gnome/shell/extensions/burn-my-windows]
+open-window-effect="hexagon.glsl"
+close-window-effect="hexagon.glsl"
+EOF'
+
+sudo dconf update
 
 # ==========================================
 # 7. CONFIGURACIÓN DEL SISTEMA Y GRUB
