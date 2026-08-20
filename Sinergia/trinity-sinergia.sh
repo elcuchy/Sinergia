@@ -118,7 +118,30 @@ sudo pacman -S --noconfirm \
   fastfetch \
   ntfs-3g \
   archlinux-tweak-tool-gtk4 \
+  terminology \ 
+  vlc-plugins-all \
+  hardinfo2\ 
+  mpv \
+  btop \
+  gparted \
+  nano \
   os-prober
+
+# ==========================================
+# . INSTALACIÓN DE YAY Y PAQUETES AUR
+# ==========================================
+echo "==> Asegurando base-devel e instalando YAY..."
+sudo pacman -S --needed base-devel git --noconfirm
+
+rm -rf yay
+git clone https://aur.archlinux.org/yay.git
+cd yay || exit
+makepkg -si --noconfirm
+cd ..
+rm -rf yay
+
+echo "==> Instalando paquetes adicionales..."
+yay -S stacer-bin
 
 # 5. Configurar GRUB para detectar otros sistemas operativos
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
