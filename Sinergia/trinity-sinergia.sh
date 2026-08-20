@@ -125,6 +125,9 @@ sudo pacman -S --noconfirm \
   btop \
   gparted \
   nano \
+  ulauncher \
+  audacious \
+  octopi \
   os-prober
 
 # ==========================================
