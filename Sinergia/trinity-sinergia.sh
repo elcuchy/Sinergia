@@ -99,6 +99,7 @@ sudo pacman -Sy --noconfirm
 # 4. Instalar TDE y el resto de los paquetes
 sudo pacman -S --noconfirm \
   tde-tdebase \
+  tde-i18n-es-trinity \
   amd-ucode \
   intel-ucode \
   okular \
@@ -116,6 +117,7 @@ sudo pacman -S --noconfirm \
   zsh-completions \
   fastfetch \
   ntfs-3g \
+  archlinux-tweak-tool-gtk4 \
   os-prober
 
 # 5. Configurar GRUB para detectar otros sistemas operativos
