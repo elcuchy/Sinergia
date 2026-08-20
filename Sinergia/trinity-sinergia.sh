@@ -99,7 +99,7 @@ sudo pacman -Sy --noconfirm
 # 4. Instalar TDE y el resto de los paquetes
 sudo pacman -S --noconfirm \
   tde-tdebase \
-  tde-i18n-es-trinity \
+  tde-i18n-es \
   amd-ucode \
   intel-ucode \
   okular \
@@ -118,9 +118,9 @@ sudo pacman -S --noconfirm \
   fastfetch \
   ntfs-3g \
   archlinux-tweak-tool-gtk4 \
-  terminology \ 
+  terminology \
   vlc-plugins-all \
-  hardinfo2\ 
+  hardinfo2 \
   mpv \
   btop \
   gparted \
