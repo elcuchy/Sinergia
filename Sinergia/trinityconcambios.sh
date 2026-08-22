@@ -239,6 +239,7 @@ EOF
 echo "==> Cambiando el ícono del menú de inicio por Arch Linux..."
 
 KICKER_CONF="$TDE_CONFIG/kickerrc"
+ARCH_ICON_PATH="/usr/share/pixmaps/archlinux-logo.png"
 
 # Asegurar que el directorio contenedor exista
 mkdir -p "$(dirname "$KICKER_CONF")"
@@ -250,14 +251,14 @@ if [ -f "$KICKER_CONF" ] && grep -q "\[KMenu\]" "$KICKER_CONF"; then
         || sed -i '/\[KMenu\]/a UseCustomButtonIcon=true' "$KICKER_CONF"
 
     grep -q "^CustomButtonIcon=" "$KICKER_CONF" \
-        && sed -i 's/^CustomButtonIcon=.*/CustomButtonIcon=archlinux/' "$KICKER_CONF" \
-        || sed -i '/\[KMenu\]/a CustomButtonIcon=archlinux' "$KICKER_CONF"
+        && sed -i "s|^CustomButtonIcon=.*|CustomButtonIcon=$ARCH_ICON_PATH|" "$KICKER_CONF" \
+        || sed -i "/\[KMenu\]/a CustomButtonIcon=$ARCH_ICON_PATH" "$KICKER_CONF"
 else
-    # Si el archivo o la sección no existen, los añadimos al final
-    cat << 'EOF' >> "$KICKER_CONF"
+    # Si el archivo o la sección no existen, los añadimos de cero
+    cat << EOF >> "$KICKER_CONF"
 
 [KMenu]
-CustomButtonIcon=archlinux
+CustomButtonIcon=$ARCH_ICON_PATH
 UseCustomButtonIcon=true
 EOF
 fi
