@@ -129,6 +129,7 @@ sudo pacman -S --noconfirm \
   audacious \
   octopi \
   tde-dolphin \
+  tde-kmplayer \
   os-prober
 
 # ==========================================
