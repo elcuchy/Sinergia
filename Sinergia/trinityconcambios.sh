@@ -188,8 +188,12 @@ mkdir -p "$TARGET_HOME/.trinity/share/apps/color-schemes"
 # ------------------------------------------
 echo "==> Configurando esquema de colores Mallory Nightshift..."
 
-# Descargar o escribir el esquema de colores Mallory Nightshift
-cat << 'EOF' > "$TARGET_HOME/.trinity/share/apps/color-schemes/MalloryNightshift.kcsrc"
+# Crear el directorio correcto de esquemas para Trinity (tdedisplay)
+COLOR_DIR="$TARGET_HOME/.trinity/share/apps/tdedisplay/color-schemes"
+mkdir -p "$COLOR_DIR"
+
+# 1. Guardar el archivo .kcsrc en la ruta esperada por TDE
+cat << 'EOF' > "$COLOR_DIR/MalloryNightshift.kcsrc"
 [Color Scheme]
 Name=Mallory Nightshift
 activeBackground=48,52,65
@@ -206,17 +210,36 @@ link=136,192,208
 visitedLink=180,142,173
 EOF
 
-# Aplicar el esquema en kdeglobals
+# 2. Inyectar la configuración activa y los colores completos en kdeglobals
 cat << 'EOF' >> "$TDE_CONFIG/kdeglobals"
 
 [General]
 colorScheme=MalloryNightshift.kcsrc
+widgetStyle=default
 
 [WM]
 activeBackground=48,52,65
+activeBlend=229,233,240
 activeForeground=229,233,240
 inactiveBackground=35,38,48
+inactiveBlend=160,165,180
 inactiveForeground=160,165,180
+
+[Colors:Button]
+background=50,54,66
+foreground=220,224,230
+
+[Colors:Window]
+background=40,44,52
+foreground=220,224,230
+
+[Colors:Selection]
+background=82,108,145
+foreground=255,255,255
+
+[Colors:View]
+background=40,44,52
+foreground=220,224,230
 EOF
 
 # ------------------------------------------
