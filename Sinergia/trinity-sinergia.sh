@@ -128,6 +128,7 @@ sudo pacman -S --noconfirm \
   ulauncher \
   audacious \
   octopi \
+  tde-dolphin \
   os-prober
 
 # ==========================================
