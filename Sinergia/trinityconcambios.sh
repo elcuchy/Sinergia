@@ -261,25 +261,31 @@ EOF
 chown -R "$TARGET_USER:" "$TARGET_HOME/.trinity"
 
 # ------------------------------------------
-# 5. CAMBIAR TEMA DE TDM A TDE (GLOBAL)
+# 5. CAMBIAR TEMA DE TDM A MINIMALISTA (GLOBAL)
 # ------------------------------------------
-echo "==> Configurando el tema del gestor de inicio TDM..."
+echo "==> Configurando el tema Minimalista en el gestor de inicio TDM..."
 
 TDM_CONFIG_FILE="/opt/trinity/share/config/tdm/tdmrc"
 [ ! -f "$TDM_CONFIG_FILE" ] && TDM_CONFIG_FILE="/etc/trinity/tdm/tdmrc"
 
-if [ -f "$TDM_CONFIG_FILE" ]; then
-    sudo sed -i 's/^#\?UseTheme=.*/UseTheme=true/' "$TDM_CONFIG_FILE"
-    sudo sed -i 's|^#\?Theme=.*|Theme=/opt/trinity/share/apps/tdm/themes/tde|' "$TDM_CONFIG_FILE"
-else
-    # Si aún no existe el archivo tdmrc por no haberse iniciado TDM, se fuerza la estructura base
-    sudo mkdir -p /etc/trinity/tdm/
-    sudo bash -c 'cat << EOF >> /etc/trinity/tdm/tdmrc
+# Ruta del tema Minimalista (busca en la ruta predeterminada de Trinity)
+THEME_PATH="/opt/trinity/share/apps/tdm/themes/minimalist"
+[ ! -d "$THEME_PATH" ] && THEME_PATH="/usr/share/apps/tdm/themes/minimalist"
 
+if [ -f "$TDM_CONFIG_FILE" ]; then
+    # Habilitar el uso de temas si no está habilitado
+    sudo sed -i 's/^#\?UseTheme=.*/UseTheme=true/' "$TDM_CONFIG_FILE"
+    
+    # Asignar la ruta del tema Minimalista
+    sudo sed -i "s|^#\?Theme=.*|Theme=$THEME_PATH|" "$TDM_CONFIG_FILE"
+else
+    # Crear estructura e insertar la configuración por defecto
+    sudo mkdir -p /etc/trinity/tdm/
+    sudo bash -c "cat << EOF > /etc/trinity/tdm/tdmrc
 [X-*-Greeter]
 UseTheme=true
-Theme=/opt/trinity/share/apps/tdm/themes/tde
-EOF'
+Theme=$THEME_PATH
+EOF"
 fi
 
 # 5. Configurar GRUB para detectar otros sistemas operativos
