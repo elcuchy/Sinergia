@@ -238,12 +238,29 @@ EOF
 # ------------------------------------------
 echo "==> Cambiando el ícono del menú de inicio por Arch Linux..."
 
-cat << 'EOF' >> "$TDE_CONFIG/kickerrc"
+KICKER_CONF="$TDE_CONFIG/kickerrc"
+
+# Asegurar que el directorio contenedor exista
+mkdir -p "$(dirname "$KICKER_CONF")"
+
+if [ -f "$KICKER_CONF" ] && grep -q "\[KMenu\]" "$KICKER_CONF"; then
+    # Si la sección [KMenu] existe, actualizamos o insertamos las claves
+    grep -q "^UseCustomButtonIcon=" "$KICKER_CONF" \
+        && sed -i 's/^UseCustomButtonIcon=.*/UseCustomButtonIcon=true/' "$KICKER_CONF" \
+        || sed -i '/\[KMenu\]/a UseCustomButtonIcon=true' "$KICKER_CONF"
+
+    grep -q "^CustomButtonIcon=" "$KICKER_CONF" \
+        && sed -i 's/^CustomButtonIcon=.*/CustomButtonIcon=archlinux/' "$KICKER_CONF" \
+        || sed -i '/\[KMenu\]/a CustomButtonIcon=archlinux' "$KICKER_CONF"
+else
+    # Si el archivo o la sección no existen, los añadimos al final
+    cat << 'EOF' >> "$KICKER_CONF"
 
 [KMenu]
 CustomButtonIcon=archlinux
 UseCustomButtonIcon=true
 EOF
+fi
 
 # ------------------------------------------
 # 4. CONFIGURAR FONDO DE KONQUEROR AL COLOR DEL ESQUEMA
