@@ -118,7 +118,6 @@ sudo pacman -S --noconfirm \
   fastfetch \
   ntfs-3g \
   archlinux-tweak-tool-gtk4 \
-  terminology \
   vlc-plugins-all \
   hardinfo2 \
   mpv \
