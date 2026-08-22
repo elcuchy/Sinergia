@@ -128,6 +128,29 @@ sudo pacman -S --noconfirm \
   ulauncher \
   audacious \
   octopi \
+  kget \
+  tde-dolphin \
+  tde-kmplayer \
+  tde-ksquirrel \
+  tde-ktorrent \
+  tde-style-baghira \
+  tde-style-domino \
+  tde-style-ia-ora \
+  tde-style-lipstik \
+  tde-style-polyester \
+  tde-style-qtcurve \
+  tde-tdebluez \
+  tde-tdemultimedia \
+  tde-tdenetwork \
+  tde-tdenetworkmanager \
+  tde-tdmtheme \
+  tde-twin-style-crystal \
+  tde-twin-style-dekorator \
+  tde-twin-style-fahrenheit \
+  tde-twin-style-machbunt \
+  tde-twin-style-mallory \
+  tde-twin-style-suse2 \
+  tde-yakuake \
   os-prober
 
 # ==========================================
