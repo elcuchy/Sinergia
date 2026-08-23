@@ -124,7 +124,7 @@ sudo pacman -S --noconfirm \
   nano \
   audacious \
   pamac-aur \
-  sddm \ 
+  sddm \
   os-prober
 
 # ==========================================
