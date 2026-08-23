@@ -166,7 +166,7 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin --noconfirm
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin --noconfirm
 
 # ==========================================
 # CONFIGURACIONES DE TRINITY DESKTOP (TDE)
