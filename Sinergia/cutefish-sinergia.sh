@@ -79,26 +79,24 @@ sudo pacman -Sy
 # Exit on error (si un comando falla, el script se detiene por seguridad)
 set -e
 
-# 1. Agregar el repositorio de Trinity Desktop (si no existe ya en pacman.conf)
-if ! grep -q "\[trinity\]" /etc/pacman.conf; then
-  echo "Añadiendo el repositorio [trinity] a /etc/pacman.conf..."
-  sudo bash -c 'cat <<EOF >> /etc/pacman.conf
+# ==========================================
+# . INSTALACIÓN DE YAY Y PAQUETES AUR
+# ==========================================
+echo "==> Asegurando base-devel e instalando YAY..."
+sudo pacman -S --needed base-devel git --noconfirm
 
-[trinity]
-Server = https://mirror.ppa.trinitydesktop.org/trinity/archlinux/\$arch
-EOF'
-fi
+rm -rf yay
+git clone https://aur.archlinux.org/yay.git
+cd yay || exit
+makepkg -si --noconfirm
+cd ..
+rm -rf yay
 
-# 2. Recibir y firmar la llave GPG
-sudo pacman-key --recv-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
-sudo pacman-key --lsign-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
-
-# 3. Actualizar las bases de datos de repositorios
-sudo pacman -Sy --noconfirm
+echo "==> Instalando paquetes adicionales..."
+yay -S cutefish-meta --noconfirm
 
 # 4. Instalar TDE y el resto de los paquetes
 sudo pacman -S --noconfirm \
-  cutefish \
   amd-ucode \
   intel-ucode \
   okular \
