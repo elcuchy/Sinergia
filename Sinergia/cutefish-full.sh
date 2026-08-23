@@ -134,6 +134,7 @@ sudo pacman -S --noconfirm \
   kdenlive \
   ventoy \
   featherpad \
+  ulauncher \
   os-prober
 
 # ==========================================
