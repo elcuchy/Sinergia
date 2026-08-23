@@ -124,7 +124,7 @@ sudo pacman -S --noconfirm \
   nano \
   audacious \
   pamac-aur \
-  lightdm \
+  sddm \
   qbittorrent \
   kate \
   obs-studio \
@@ -148,7 +148,7 @@ sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
 # 6. Habilitar el gestor de inicio de TDE
-sudo systemctl enable lightdm.service
+sudo systemctl enable sddm.service
 
 # 7. Limpieza opcional
 rm -rf ~/LinuxScripts
