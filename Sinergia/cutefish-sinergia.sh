@@ -130,15 +130,6 @@ sudo pacman -S --noconfirm \
 # ==========================================
 # . INSTALACIÓN DE YAY Y PAQUETES AUR
 # ==========================================
-echo "==> Asegurando base-devel e instalando YAY..."
-sudo pacman -S --needed base-devel git --noconfirm
-
-rm -rf yay
-git clone https://aur.archlinux.org/yay.git
-cd yay || exit
-makepkg -si --noconfirm
-cd ..
-rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
 yay -S stacer-bin --noconfirm
