@@ -256,51 +256,6 @@ TransparentAmount=30
 EOF
 
 # ------------------------------------------
-# 3. CAMBIAR ÍCONO DEL MENÚ TDE A ARCHLINUX
-# ------------------------------------------
-echo "==> Cambiando el ícono del menú de inicio por Arch Linux..."
-
-KICKER_CONF="$TDE_CONFIG/kickerrc"
-ARCH_ICON_PATH="/usr/share/pixmaps/archlinux-logo.png"
-
-# Asegurar que el directorio contenedor exista
-mkdir -p "$(dirname "$KICKER_CONF")"
-
-if [ -f "$KICKER_CONF" ] && grep -q "\[KMenu\]" "$KICKER_CONF"; then
-    # Si la sección [KMenu] existe, actualizamos o insertamos las claves
-    grep -q "^UseCustomButtonIcon=" "$KICKER_CONF" \
-        && sed -i 's/^UseCustomButtonIcon=.*/UseCustomButtonIcon=true/' "$KICKER_CONF" \
-        || sed -i '/\[KMenu\]/a UseCustomButtonIcon=true' "$KICKER_CONF"
-
-    grep -q "^CustomButtonIcon=" "$KICKER_CONF" \
-        && sed -i "s|^CustomButtonIcon=.*|CustomButtonIcon=$ARCH_ICON_PATH|" "$KICKER_CONF" \
-        || sed -i "/\[KMenu\]/a CustomButtonIcon=$ARCH_ICON_PATH" "$KICKER_CONF"
-else
-    # Si el archivo o la sección no existen, los añadimos de cero
-    cat << EOF >> "$KICKER_CONF"
-
-[KMenu]
-CustomButtonIcon=$ARCH_ICON_PATH
-UseCustomButtonIcon=true
-EOF
-fi
-
-# ------------------------------------------
-# 4. CONFIGURAR FONDO DE KONQUEROR AL COLOR DEL ESQUEMA
-# ------------------------------------------
-echo "==> Ajustando color de fondo de Konqueror..."
-
-cat << 'EOF' >> "$TDE_CONFIG/konquerorrc"
-
-[FmView Properties]
-BackgroundMode=1
-BackgroundColor=40,44,52
-EOF
-
-# Ajustar permisos de los archivos creados en el HOME del usuario
-chown -R "$TARGET_USER:" "$TARGET_HOME/.trinity"
-
-# ------------------------------------------
 # 5. CAMBIAR TEMA DE TDM A MINIMALISTA (GLOBAL)
 # ------------------------------------------
 echo "==> Configurando el tema Minimalista en el gestor de inicio TDM..."
