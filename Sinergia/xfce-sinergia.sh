@@ -91,7 +91,6 @@ sudo pacman -S --noconfirm \
   pipewire-pulse \
   wireplumber \
   pavucontrol \
-  terminal \
   network-manager-applet \
   amd-ucode \
   intel-ucode \
