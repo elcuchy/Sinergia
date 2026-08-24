@@ -179,8 +179,7 @@ yay -S --needed --noconfirm \
   aimp \
   iptvnator-bin \
   yaru-colors-icon-theme \
-  fetch-git \
-  lightdm-arctica-greeter
+  fetch-git
 
 
 # ==========================================
@@ -273,8 +272,8 @@ fi
 # ==========================================
 # 7. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
-echo "==> Configurando LightDM con Arctica Greeter..."
-sudo sed -i 's/#\?greeter-session=.*/greeter-session=lightdm-arctica-greeter/' /etc/lightdm/lightdm.conf
+echo "==> Configurando LightDM con GTK Greeter..."
+sudo sed -i 's/#\?greeter-session=.*/greeter-session=lightdm-gtk-greeter/' /etc/lightdm/lightdm.conf
 sudo systemctl enable lightdm
 
 echo "==> Configurando GRUB para detectar otros SO..."
