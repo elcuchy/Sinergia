@@ -3,22 +3,6 @@
 # Exit on error (si un comando falla, el script se detiene por seguridad)
 set -e
 
-# Comprobar que el script se ejecute con privilegios sudo/root
-if [ "$EUID" -ne 0 ]; then
-  echo "Error: Este script debe ejecutarse con permisos de administrador (sudo)."
-  echo "Por favor, ejecútalo como: sudo ./tu_script.sh"
-  exit 1
-fi
-
-# Identificar usuario real que invocó sudo
-REAL_USER=${SUDO_USER:-$USER}
-USER_HOME=$(eval echo "~$REAL_USER")
-
-if [ "$REAL_USER" = "root" ]; then
-    echo "Atención: No ejecutes este script directamente como root absoluto."
-    echo "Ejecútalo con tu usuario normal usando: sudo ./script.sh"
-    exit 1
-fi
 
 # ==========================================
 # 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
