@@ -96,7 +96,6 @@ sudo pacman -S --noconfirm \
   intel-ucode \
   okular \
   vlc \
-  ark \
   unrar \
   p7zip \
   chromium \
@@ -120,6 +119,32 @@ sudo pacman -S --noconfirm \
   ulauncher \
   audacious \
   pamac-aur \
+  gvfs-dnssd \
+  gvfs-wsdd \
+  rygel \
+  tracker3-miners \
+  gvfs \
+  gvfs-afc \
+  gvfs-gphoto2 \
+  gvfs-mtp \
+  gvfs-nfs \
+  gvfs-smb \
+  transmission-gtk \
+  xarchiver \
+  mousepad \
+  xfce4-taskmanager \
+  xfce4-screenshooter \
+  obs-studio \
+  audacity \
+  ardour \
+  kdenlive \
+  ventoy \
+  papirus-icon-theme \
+  mint-l-icons \
+  mint-x-icons \
+  mint-y-icons \
+  mate-icon-theme-faenza \
+  rustdesk-bin \
   os-prober
 
 # ==========================================
