@@ -171,7 +171,7 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales desde AUR..."
-yay -S stacer-bin sinergia-dd-burner aimp iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
+yay -S stacer-bin sinergia-dd-burner aimp iptvnator-bin yaru-colors-icon-theme fetch-git lightdm-arctica-greeter --noconfirm
 
 
 # ==========================================
