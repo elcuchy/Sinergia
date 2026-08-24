@@ -146,6 +146,10 @@ sudo pacman -S --noconfirm \
   mate-icon-theme-faenza \
   rustdesk-bin \
   gnome-boxes \
+  amber-theme-git \
+  arc-gtk-theme \
+  colloid-gtk-theme-git \
+  graphite-gtk-theme-black-normal-git \
   os-prober
 
 # ==========================================
