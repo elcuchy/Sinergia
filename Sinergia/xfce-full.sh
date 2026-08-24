@@ -145,6 +145,7 @@ sudo pacman -S --noconfirm \
   mint-y-icons \
   mate-icon-theme-faenza \
   rustdesk-bin \
+  gnome-boxes \
   os-prober
 
 # ==========================================
