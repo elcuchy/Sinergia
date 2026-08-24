@@ -91,6 +91,7 @@ sudo pacman -S --noconfirm --needed \
   xfce4 \
   xfce4-goodies \
   lightdm \
+  lightdm-gtk-greeter \
   pipewire-pulse \
   wireplumber \
   pavucontrol \
@@ -170,9 +171,15 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales desde AUR..."
-yay -S stacer-bin sinergia-dd-burner aimp iptvnator-bin yaru-colors-icon-theme fetch-git lightdm-arctica-greeter --noconfirm
-
-
+yay -S --needed --noconfirm \
+  stacer-bin \
+  sinergia-dd-burner \
+  aimp \
+  iptvnator-bin \
+  yaru-colors-icon-theme \
+  fetch-git \
+  lightdm-arctica-greeter
+  
 # ==========================================
 # 6. CONFIGURACIÓN DE APARIENCIA Y ENTORNO
 # ==========================================
