@@ -94,9 +94,9 @@ sudo pacman -S --noconfirm \
   network-manager-applet \
   amd-ucode \
   intel-ucode \
-  okular \
+  atril \
   vlc \
-  ark \
+  xarchiver \
   unrar \
   p7zip \
   chromium \
