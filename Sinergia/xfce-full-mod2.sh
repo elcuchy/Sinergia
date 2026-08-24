@@ -3,24 +3,27 @@
 # Exit on error (si un comando falla, el script se detiene por seguridad)
 set -e
 
+# Identificar usuario real (en caso de ejecutar con sudo)
+REAL_USER=${SUDO_USER:-$USER}
+USER_HOME=$(eval echo "~$REAL_USER")
 
 # ==========================================
 # 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
 # ==========================================
 if [ ! -f /etc/pacman.conf.bak_repos ]; then
     echo "==> Creando respaldo de /etc/pacman.conf..."
-    cp /etc/pacman.conf /etc/pacman.conf.bak_repos
+    sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
 fi
 
 echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
 if ! grep -q "^ILoveCandy" /etc/pacman.conf; then
-    sed -i '/^\[options\]/a ILoveCandy' /etc/pacman.conf
+    sudo sed -i '/^\[options\]/a ILoveCandy' /etc/pacman.conf
 fi
 
 if grep -q "^#ParallelDownloads" /etc/pacman.conf; then
-    sed -i 's/^#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
+    sudo sed -i 's/^#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
 elif ! grep -q "^ParallelDownloads" /etc/pacman.conf; then
-    sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
+    sudo sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 fi
 
 
