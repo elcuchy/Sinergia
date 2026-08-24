@@ -91,7 +91,6 @@ sudo pacman -S --noconfirm --needed \
   xfce4 \
   xfce4-goodies \
   lightdm \
-  lightdm-arctica-greeter \
   pipewire-pulse \
   wireplumber \
   pavucontrol \
