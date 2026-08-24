@@ -161,7 +161,7 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin --noconfirm
+yay -S stacer-bin sinergia-dd-burner aimp iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
 
 # 5. Configurar GRUB para detectar otros sistemas operativos
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
