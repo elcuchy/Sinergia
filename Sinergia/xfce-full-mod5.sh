@@ -288,8 +288,9 @@ if [ -n "$DISPLAY" ] && command -v xfconf-query &>/dev/null; then
     xfconf-query -c xfce4-panel -p /panels/panel-1/mode -s 0 --create -t int
     xfconf-query -c xfce4-panel -p /panels/panel-1/position-locked -s true --create -t bool
     
-    # Reiniciar panel
+   # Reiniciar panel
     xfce4-panel -r &>/dev/null &
+fi
 
 # ==========================================
 # 7. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
