@@ -280,6 +280,16 @@ if ! grep -q "QT_QPA_PLATFORMTHEME" /etc/environment; then
     echo "QT_QPA_PLATFORMTHEME=qt5ct" | sudo tee -a /etc/environment
 fi
 
+# FORZAR CAMBIO EN VIVO EN XFCE 4.20
+# XFCE 4.20 requiere la inyección directa por DBus via xfconf-query si hay sesión gráfica activa:
+if [ -n "$DISPLAY" ] && command -v xfconf-query &>/dev/null; then
+    # Aplicar comandos directo al demonio xfconf activo
+    xfconf-query -c xfce4-panel -p /panels/panel-1/position -s "p=10;x=0;y=0" --create -t string
+    xfconf-query -c xfce4-panel -p /panels/panel-1/mode -s 0 --create -t int
+    xfconf-query -c xfce4-panel -p /panels/panel-1/position-locked -s true --create -t bool
+    
+    # Reiniciar panel
+    xfce4-panel -r &>/dev/null &
 
 # ==========================================
 # 7. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
@@ -292,16 +302,6 @@ echo "==> Configurando GRUB para detectar otros SO..."
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-# FORZAR CAMBIO EN VIVO EN XFCE 4.20
-# XFCE 4.20 requiere la inyección directa por DBus via xfconf-query si hay sesión gráfica activa:
-if [ -n "$DISPLAY" ] && command -v xfconf-query &>/dev/null; then
-    # Aplicar comandos directo al demonio xfconf activo
-    xfconf-query -c xfce4-panel -p /panels/panel-1/position -s "p=10;x=0;y=0" --create -t string
-    xfconf-query -c xfce4-panel -p /panels/panel-1/mode -s 0 --create -t int
-    xfconf-query -c xfce4-panel -p /panels/panel-1/position-locked -s true --create -t bool
-    
-    # Reiniciar panel
-    xfce4-panel -r &>/dev/null &
 
 # ==========================================
 # 8. LIMPIEZA Y REINICIO
