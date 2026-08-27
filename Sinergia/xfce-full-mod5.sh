@@ -218,34 +218,7 @@ apply_user_configs() {
 </channel>
 EOF
 
-    # 2. Configurar Panel inferior para XFCE 4.20
-    # En 4.20 "p=10" requiere 'position-locked'=true y 'length-adjust'=true explícitos para no ignorar el borde inferior
-    $SUDO_CMD tee "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" > /dev/null << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfce4-panel" version="1.0">
-  <property name="configver" type="int" value="2"/>
-  <property name="panels" type="array">
-    <value type="int" value="1"/>
-  </property>
-  <property name="panes" type="empty"/>
-  <property name="panel-1" type="empty">
-    <property name="position" type="string" value="p=10;x=0;y=0"/>
-    <property name="length" type="uint" value="100"/>
-    <property name="length-adjust" type="bool" value="true"/>
-    <property name="position-locked" type="bool" value="true"/>
-    <property name="size" type="uint" value="28"/>
-    <property name="mode" type="uint" value="0"/>
-    <property name="plugin-ids" type="array">
-      <value type="int" value="1"/>
-      <value type="int" value="2"/>
-      <value type="int" value="3"/>
-      <value type="int" value="4"/>
-      <value type="int" value="5"/>
-      <value type="int" value="6"/>
-    </property>
-  </property>
-</channel>
-EOF
+
 
     # 3. Configuración Terminal
     $SUDO_CMD tee "$TARGET_DIR/xfce4/terminal/terminalrc" > /dev/null << 'EOF'
@@ -280,17 +253,7 @@ if ! grep -q "QT_QPA_PLATFORMTHEME" /etc/environment; then
     echo "QT_QPA_PLATFORMTHEME=qt5ct" | sudo tee -a /etc/environment
 fi
 
-# FORZAR CAMBIO EN VIVO EN XFCE 4.20
-# XFCE 4.20 requiere la inyección directa por DBus via xfconf-query si hay sesión gráfica activa:
-if [ -n "$DISPLAY" ] && command -v xfconf-query &>/dev/null; then
-    # Aplicar comandos directo al demonio xfconf activo
-    xfconf-query -c xfce4-panel -p /panels/panel-1/position -s "p=10;x=0;y=0" --create -t string
-    xfconf-query -c xfce4-panel -p /panels/panel-1/mode -s 0 --create -t int
-    xfconf-query -c xfce4-panel -p /panels/panel-1/position-locked -s true --create -t bool
-    
-   # Reiniciar panel
-    xfce4-panel -r &>/dev/null &
-fi
+
 
 # ==========================================
 # 7. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
