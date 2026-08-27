@@ -1,21 +1,22 @@
 #!/bin/bash
 
 # ==========================================
-# 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
+# 1. CONFIGURACIÓN DE RESPALDO Y PACMAN (OPTIMIZACIONES SONICDE)
 # ==========================================
 if [ ! -f /etc/pacman.conf.bak_repos ]; then
     echo "==> Creando respaldo de /etc/pacman.conf..."
     sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
 fi
 
-# Agregar ILoveCandy y habilitar ParallelDownloads si no existen
-echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
+echo "==> Aplicando ajustes recomendados en pacman.conf (ILoveCandy, ParallelDownloads)..."
 if ! grep -q "ILoveCandy" /etc/pacman.conf; then
     sudo sed -i '/#Misc options/a ILoveCandy' /etc/pacman.conf
 fi
 
 if grep -q "#ParallelDownloads" /etc/pacman.conf; then
-    sudo sed -i 's/#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
+    sudo sed -i 's/#ParallelDownloads/ParallelDownloads = 5/g' /etc/pacman.conf
+elif ! grep -q "ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i '/#Misc options/a ParallelDownloads = 5' /etc/pacman.conf
 fi
 
 
@@ -85,7 +86,7 @@ sudo pacman -S --needed xlibre-server xlibre-xinit xlibre-apps xf86-input-libinp
 echo "==> Instalando LightDM y su interfaz gráfica GTK..."
 sudo pacman -S --needed lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings --noconfirm
 
-echo "==> Instalando entorno de escritorio SonicDE..."
+echo "==> Instalando entorno de escritorio SonicDE y sus dependencias de sesión..."
 sudo pacman -S --needed sonic-desktop-git sonic-session sonic-settings --noconfirm || \
 sudo pacman -S --needed sonic-de --noconfirm
 
@@ -105,6 +106,65 @@ rm -rf yay
 
 echo "==> Instalando paquetes adicionales desde AUR..."
 yay -S --needed stacer-bin --noconfirm
+
+
+# ==========================================
+# 6. CONFIGURACIÓN ESPECÍFICA DE SONICDE Y XLIBRE
+# ==========================================
+echo "==> Configurando variables de entorno e integración de SonicDE..."
+
+# Detectar usuario real en lugar de root
+REAL_USER=${SUDO_USER:-$USER}
+USER_HOME=$(eval echo "~$REAL_USER")
+
+# Configurar variables globales recomendadas para Qt/GTK en SonicDE
+sudo bash -c 'cat << EOF >> /etc/environment
+XDG_CURRENT_DESKTOP=SonicDE
+DESKTOP_SESSION=sonic
+QT_QPA_PLATFORMTHEME=qt5ct
+EOF'
+
+# Crear archivo .xinitrc para soporte de inicio directo vía startx/XLibre
+cat << 'EOF' > "$USER_HOME/.xinitrc"
+#!/bin/sh
+userresources=$HOME/.Xresources
+usermodmap=$HOME/.Xmodmap
+sysresources=/etc/X11/xinit/.Xresources
+sysmodmap=/etc/X11/xinit/.Xmodmap
+
+if [ -f $sysresources ]; then
+    xrdb -merge $sysresources
+fi
+
+if [ -f $sysmodmap ]; then
+    xmodmap $sysmodmap
+fi
+
+if [ -f "$userresources" ]; then
+    xrdb -merge "$userresources"
+fi
+
+if [ -f "$usermodmap" ]; then
+    xmodmap "$usermodmap"
+fi
+
+if [ -d /etc/X11/xinit/xinitrc.d ] ; then
+ for f in /etc/X11/xinit/xinitrc.d/?*.sh ; do
+  [ -x "$f" ] && . "$f"
+ done
+ unset f
+fi
+
+exec sonic-session
+EOF
+
+chmod +x "$USER_HOME/.xinitrc"
+chown "$REAL_USER:$REAL_USER" "$USER_HOME/.xinitrc"
+
+# Configurar LightDM para preseleccionar la sesión de SonicDE
+if [ -f /etc/lightdm/lightdm.conf ]; then
+    sudo sed -i 's/#\?user-session=.*/user-session=sonic/' /etc/lightdm/lightdm.conf
+fi
 
 
 # ==========================================
