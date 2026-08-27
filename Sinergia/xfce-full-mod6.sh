@@ -183,7 +183,7 @@ yay -S --needed --noconfirm \
 # ==========================================
 # 6. CONFIGURACIÓN DE APARIENCIA Y ENTORNO
 # ==========================================
-echo "==> Personalizando apariencia (Graphite-Dark, Yaru-MATE, Eliminación del Dock inferior)..."
+echo "==> Personalizando apariencia y configurando barra superior única (sin dock)..."
 
 apply_user_configs() {
     local TARGET_DIR="$1"
@@ -217,7 +217,7 @@ apply_user_configs() {
 </channel>
 EOF
 
-    # 2. Configuración de Panel Único en XFCE 4.20 (Eliminando Panel 2 / Dock)
+    # 2. Configuración explícita de la Barra Superior Única (Panel 1 completo + Sin Dock)
     $SUDO_CMD tee "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" > /dev/null << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-panel" version="1.0">
@@ -225,13 +225,11 @@ EOF
   <property name="panels" type="array">
     <value type="int" value="1"/>
   </property>
-  <property name="panes" type="empty"/>
   <property name="panel-1" type="empty">
     <property name="position" type="string" value="p=6;x=0;y=0"/>
     <property name="length" type="uint" value="100"/>
     <property name="position-locked" type="bool" value="true"/>
     <property name="size" type="uint" value="28"/>
-    <property name="mode" type="uint" value="0"/>
     <property name="plugin-ids" type="array">
       <value type="int" value="1"/>
       <value type="int" value="2"/>
@@ -239,7 +237,20 @@ EOF
       <value type="int" value="4"/>
       <value type="int" value="5"/>
       <value type="int" value="6"/>
+      <value type="int" value="7"/>
     </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="applicationsmenu"/>
+    <property name="plugin-2" type="string" value="tasklist"/>
+    <property name="plugin-3" type="string" value="separator">
+      <property name="expand" type="bool" value="true"/>
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-4" type="string" value="pager"/>
+    <property name="plugin-5" type="string" value="systray"/>
+    <property name="plugin-6" type="string" value="clock"/>
+    <property name="plugin-7" type="string" value="actions"/>
   </property>
 </channel>
 EOF
