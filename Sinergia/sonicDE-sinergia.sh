@@ -97,7 +97,7 @@ echo "==> Instalando utilidades base del sistema..."
 sudo pacman -S --needed ntfs-3g os-prober --noconfirm
 
 echo "==> Instalando servidor de despliegue XLibre (stack X11)..."
-sudo pacman -S --needed xlibre-server xlibre-xinit xlibre-apps xf86-input-libinput --noconfirm
+sudo pacman -S --needed xlibre-server xlibre-xinit xlibre-apps xf86-input-libinput xlibre-video-amdgpu xlibre-video-intel --noconfirm
 
 echo "==> Instalando el paquete meta oficial de SonicDE (incluye SonicLogin)..."
 sudo pacman -S sonicde-meta --noconfirm --needed
