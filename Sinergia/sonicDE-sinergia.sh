@@ -50,7 +50,7 @@ sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /et
 
 
 # ==========================================
-# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR Y REPOSITORIO OFICIAL SONICDE
 # ==========================================
 echo "==> Configurando el repositorio Chaotic-AUR..."
 
@@ -70,12 +70,28 @@ Include = /etc/pacman.d/chaotic-mirrorlist
 EOF'
 fi
 
-echo "==> Actualizando la base de datos de repositorios..."
-sudo pacman -Sy
+echo "==> Configurando el repositorio oficial de SonicDE..."
+curl -O https://sonicde-arch.github.io/sonicde-archlinux.asc
+sudo pacman-key --add sonicde-archlinux.asc
+sudo pacman-key --finger 3B87898C73F11DF5
+sudo pacman-key --lsign-key 3B87898C73F11DF5
+rm -f sonicde-archlinux.asc
+
+if ! grep -q "\[sonicde\]" /etc/pacman.conf; then
+    echo "==> Agregando [sonicde] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[sonicde]
+Server = https://sonicde-arch.github.io/\$arch
+EOF'
+fi
+
+echo "==> Actualizando la base de datos de repositorios y del sistema..."
+sudo pacman -Syyu --noconfirm
 
 
 # ==========================================
-# 4. INSTALACIÓN DE PAQUETES DE PACMAN, XLIBRE Y LIGHTDM
+# 4. INSTALACIÓN DE PAQUETES BASE, XLIBRE Y SONICDE-META
 # ==========================================
 echo "==> Instalando utilidades base del sistema..."
 sudo pacman -S --needed ntfs-3g os-prober --noconfirm
@@ -83,12 +99,8 @@ sudo pacman -S --needed ntfs-3g os-prober --noconfirm
 echo "==> Instalando servidor de despliegue XLibre (stack X11)..."
 sudo pacman -S --needed xlibre-server xlibre-xinit xlibre-apps xf86-input-libinput --noconfirm
 
-echo "==> Instalando LightDM y su interfaz gráfica GTK..."
-sudo pacman -S --needed lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings --noconfirm
-
-echo "==> Instalando entorno de escritorio SonicDE y sus dependencias de sesión..."
-sudo pacman -S --needed sonic-desktop-git sonic-session sonic-settings --noconfirm || \
-sudo pacman -S --needed sonic-de --noconfirm
+echo "==> Instalando el paquete meta oficial de SonicDE (incluye SonicLogin)..."
+sudo pacman -S sonicde-meta --noconfirm --needed
 
 
 # ==========================================
@@ -109,22 +121,19 @@ yay -S --needed stacer-bin --noconfirm
 
 
 # ==========================================
-# 6. CONFIGURACIÓN ESPECÍFICA DE SONICDE Y XLIBRE
+# 6. CONFIGURACIÓN ESPECÍFICA DE SONICDE Y ENTORNO DE USUARIO
 # ==========================================
-echo "==> Configurando variables de entorno e integración de SonicDE..."
+echo "==> Configurando variables de entorno e integración..."
 
-# Detectar usuario real en lugar de root
 REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo "~$REAL_USER")
 
-# Configurar variables globales recomendadas para Qt/GTK en SonicDE
 sudo bash -c 'cat << EOF >> /etc/environment
 XDG_CURRENT_DESKTOP=SonicDE
 DESKTOP_SESSION=sonic
 QT_QPA_PLATFORMTHEME=qt5ct
 EOF'
 
-# Crear archivo .xinitrc para soporte de inicio directo vía startx/XLibre
 cat << 'EOF' > "$USER_HOME/.xinitrc"
 #!/bin/sh
 userresources=$HOME/.Xresources
@@ -132,21 +141,10 @@ usermodmap=$HOME/.Xmodmap
 sysresources=/etc/X11/xinit/.Xresources
 sysmodmap=/etc/X11/xinit/.Xmodmap
 
-if [ -f $sysresources ]; then
-    xrdb -merge $sysresources
-fi
-
-if [ -f $sysmodmap ]; then
-    xmodmap $sysmodmap
-fi
-
-if [ -f "$userresources" ]; then
-    xrdb -merge "$userresources"
-fi
-
-if [ -f "$usermodmap" ]; then
-    xmodmap "$usermodmap"
-fi
+if [ -f $sysresources ]; then xrdb -merge $sysresources; fi
+if [ -f $sysmodmap ]; then xmodmap $sysmodmap; fi
+if [ -f "$userresources" ]; then xrdb -merge "$userresources"; fi
+if [ -f "$usermodmap" ]; then xmodmap "$usermodmap"; fi
 
 if [ -d /etc/X11/xinit/xinitrc.d ] ; then
  for f in /etc/X11/xinit/xinitrc.d/?*.sh ; do
@@ -161,30 +159,26 @@ EOF
 chmod +x "$USER_HOME/.xinitrc"
 chown "$REAL_USER:$REAL_USER" "$USER_HOME/.xinitrc"
 
-# Configurar LightDM para preseleccionar la sesión de SonicDE
-if [ -f /etc/lightdm/lightdm.conf ]; then
-    sudo sed -i 's/#\?user-session=.*/user-session=sonic/' /etc/lightdm/lightdm.conf
-fi
-
 
 # ==========================================
-# 7. CONFIGURACIÓN DEL SISTEMA, LIGHTDM Y GRUB
+# 7. GESTIÓN EXCLUSIVA DE SONICLOGIN Y GRUB
 # ==========================================
+echo "==> Deshabilitando otros gestores de inicio de sesión..."
+sudo systemctl disable plasmalogin.service gdm.service sddm.service lightdm.service &>/dev/null
+sudo systemctl stop plasmalogin.service gdm.service sddm.service lightdm.service &>/dev/null
+
+echo "==> Habilitando el servicio SonicLogin..."
+sudo systemctl enable soniclogin.service
+
 echo "==> Habilitando os-prober en GRUB..."
 if [ -f /etc/default/grub ]; then
     sudo sed -i "s/#\?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=\"false\"/" /etc/default/grub
 fi
 
-echo "==> Deshabilitando otros gestores de pantalla para evitar conflictos..."
-sudo systemctl disable gdm.service sddm.service &>/dev/null
-
-echo "==> Habilitando servicio LightDM..."
-sudo systemctl enable lightdm.service
-
 echo "==> Actualizando GRUB..."
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-echo "==> Limpiando carpeta temporal del script..."
+echo "==> Limpiando archivos temporales..."
 rm -rf ~/LinuxScripts
 
 echo "==> Proceso finalizado con éxito. Reiniciando el sistema en 5 segundos..."
