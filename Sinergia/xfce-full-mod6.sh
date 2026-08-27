@@ -181,27 +181,32 @@ yay -S --needed --noconfirm \
 
 
 # ==========================================
-# 6. CONFIGURACIÓN DE APARIENCIA Y ENTORNO
+# 6. CONFIGURACIÓN DE APARIENCIA Y PANEL ÚNICO INFERIOR
 # ==========================================
-echo "==> Personalizando apariencia y configurando barra superior única (sin dock)..."
+echo "==> Reseteando paneles y aplicando barra inferior personalizada..."
 
 apply_user_configs() {
     local TARGET_DIR="$1"
     
-    # Crear los directorios
+    # Crear los directorios necesarios
     if [[ "$TARGET_DIR" == /etc/* ]]; then
         sudo mkdir -p "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml"
+        sudo mkdir -p "$TARGET_DIR/xfce4/panel"
         sudo mkdir -p "$TARGET_DIR/xfce4/terminal"
         sudo mkdir -p "$TARGET_DIR/gtk-3.0"
         sudo mkdir -p "$TARGET_DIR/gtk-4.0"
         SUDO_CMD="sudo"
     else
         mkdir -p "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml"
+        mkdir -p "$TARGET_DIR/xfce4/panel"
         mkdir -p "$TARGET_DIR/xfce4/terminal"
         mkdir -p "$TARGET_DIR/gtk-3.0"
         mkdir -p "$TARGET_DIR/gtk-4.0"
         SUDO_CMD=""
     fi
+
+    # Eliminar cualquier residuo de paneles viejos para forzar recreación
+    $SUDO_CMD rm -rf "$TARGET_DIR/xfce4/panel"
 
     # 1. Configuración del Tema e Íconos
     $SUDO_CMD tee "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml" > /dev/null << 'EOF'
@@ -217,7 +222,7 @@ apply_user_configs() {
 </channel>
 EOF
 
-    # 2. Configuración explícita de la Barra Superior Única (Panel 1 completo + Sin Dock)
+    # 2. Definición del Panel Único Inferior con Orden Exacto de Plugins
     $SUDO_CMD tee "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" > /dev/null << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <channel name="xfce4-panel" version="1.0">
@@ -226,10 +231,10 @@ EOF
     <value type="int" value="1"/>
   </property>
   <property name="panel-1" type="empty">
-    <property name="position" type="string" value="p=6;x=0;y=0"/>
+    <property name="position" type="string" value="p=10;x=0;y=0"/>
     <property name="length" type="uint" value="100"/>
     <property name="position-locked" type="bool" value="true"/>
-    <property name="size" type="uint" value="28"/>
+    <property name="size" type="uint" value="30"/>
     <property name="plugin-ids" type="array">
       <value type="int" value="1"/>
       <value type="int" value="2"/>
@@ -238,19 +243,30 @@ EOF
       <value type="int" value="5"/>
       <value type="int" value="6"/>
       <value type="int" value="7"/>
+      <value type="int" value="8"/>
+      <value type="int" value="9"/>
+      <value type="int" value="10"/>
     </property>
   </property>
   <property name="plugins" type="empty">
     <property name="plugin-1" type="string" value="applicationsmenu"/>
     <property name="plugin-2" type="string" value="tasklist"/>
     <property name="plugin-3" type="string" value="separator">
-      <property name="expand" type="bool" value="true"/>
       <property name="style" type="uint" value="0"/>
     </property>
     <property name="plugin-4" type="string" value="pager"/>
-    <property name="plugin-5" type="string" value="systray"/>
-    <property name="plugin-6" type="string" value="clock"/>
-    <property name="plugin-7" type="string" value="actions"/>
+    <property name="plugin-5" type="string" value="separator">
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-6" type="string" value="systray"/>
+    <property name="plugin-7" type="string" value="separator">
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-8" type="string" value="clock"/>
+    <property name="plugin-9" type="string" value="separator">
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-10" type="string" value="actions"/>
   </property>
 </channel>
 EOF
