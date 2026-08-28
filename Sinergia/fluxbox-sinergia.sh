@@ -82,11 +82,20 @@ sudo pacman -Sy
 
 
 # ==========================================
-# 4. INSTALACIÓN DE PAQUETES DEL SISTEMA Y FLUXBOX
+# 4. INSTALACIÓN DE PAQUETES DEL SISTEMA, THUNAR, FLUXBOX Y TEMAS GTK
 # ==========================================
-echo "==> Instalando paquetes base, Fluxbox y software del sistema..."
+echo "==> Instalando paquetes base, Thunar, Fluxbox y software del sistema..."
 sudo pacman -S --noconfirm --needed \
   fluxbox \
+  menumaker \
+  picom \
+  arc-gtk-theme \
+  papirus-icon-theme \
+  lxappearance \
+  thunar \
+  thunar-archive-plugin \
+  thunar-volman \
+  tumbler \
   xorg-server \
   xorg-xinit \
   xorg-xmessage \
@@ -147,7 +156,128 @@ sudo -u "$REAL_USER" yay -S --needed stacer-bin --noconfirm
 
 
 # ==========================================
-# 6. CONFIGURACIÓN DE SERVICIOS Y GRUB
+# 6. CONFIGURACIÓN DEL TEMA GTK Y DE ICONOS
+# ==========================================
+echo "==> Aplicando configuración visual GTK (Arc-Dark + Papirus)..."
+
+setup_gtk_theme() {
+    local TARGET_HOME="$1"
+    local TARGET_USER="$2"
+
+    # GTK 2.0
+    sudo -u "$TARGET_USER" tee "$TARGET_HOME/.gtkrc-2.0" > /dev/null << 'EOF'
+gtk-theme-name="Arc-Dark"
+gtk-icon-theme-name="Papirus-Dark"
+gtk-font-name="Noto Sans 10"
+gtk-cursor-theme-name="Adwaita"
+EOF
+
+    # GTK 3.0
+    sudo -u "$TARGET_USER" mkdir -p "$TARGET_HOME/.config/gtk-3.0"
+    sudo -u "$TARGET_USER" tee "$TARGET_HOME/.config/gtk-3.0/settings.ini" > /dev/null << 'EOF'
+[Settings]
+gtk-theme-name=Arc-Dark
+gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=Noto Sans 10
+gtk-cursor-theme-name=Adwaita
+gtk-application-prefer-dark-theme=1
+EOF
+}
+
+# Aplicar al usuario actual
+setup_gtk_theme "$USER_HOME" "$REAL_USER"
+
+# Configurar plantilla para /etc/skel
+sudo mkdir -p /etc/skel/.config/gtk-3.0
+sudo tee /etc/skel/.gtkrc-2.0 > /dev/null << 'EOF'
+gtk-theme-name="Arc-Dark"
+gtk-icon-theme-name="Papirus-Dark"
+gtk-font-name="Noto Sans 10"
+EOF
+
+sudo tee /etc/skel/.config/gtk-3.0/settings.ini > /dev/null << 'EOF'
+[Settings]
+gtk-theme-name=Arc-Dark
+gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=Noto Sans 10
+gtk-application-prefer-dark-theme=1
+EOF
+
+
+# ==========================================
+# 7. CONFIGURACIÓN DE FLUXBOX Y MENÚ DE APLICACIONES
+# ==========================================
+echo "==> Estructurando configuración de Fluxbox..."
+
+setup_fluxbox_user() {
+    local TARGET_HOME="$1"
+    local TARGET_USER="$2"
+    local FLUX_DIR="$TARGET_HOME/.fluxbox"
+
+    sudo -u "$TARGET_USER" mkdir -p "$FLUX_DIR"
+
+    # Generar menú dinámico de aplicaciones
+    sudo -u "$TARGET_USER" mmaker -f FluxBox
+
+    # Archivo de inicio (Startup)
+    sudo tee "$FLUX_DIR/startup" > /dev/null << 'EOF'
+#!/bin/sh
+
+# Iniciar compositor visual (sombras y transparencias)
+picom -b &
+
+# Fondo de pantalla neutro
+feh --bg-fill /usr/share/backgrounds/archlinux/simple.png 2>/dev/null || xsetroot -solid "#1e1e2e" &
+
+# Iniciar Ulauncher en segundo plano
+ulauncher --hide-window &
+
+# Ejecutar Fluxbox
+exec fluxbox
+EOF
+
+    sudo chmod +x "$FLUX_DIR/startup"
+    sudo chown -R "$TARGET_USER:$TARGET_USER" "$FLUX_DIR"
+}
+
+setup_fluxbox_user "$USER_HOME" "$REAL_USER"
+
+sudo mkdir -p /etc/skel/.fluxbox
+sudo mmaker -f FluxBox --output /etc/skel/.fluxbox/menu
+
+
+# ==========================================
+# 8. CONFIGURACIÓN DE ENTORNO X11 (.xinitrc)
+# ==========================================
+echo "==> Configurando .xinitrc para iniciar Fluxbox con startx..."
+
+create_xinitrc() {
+    local TARGET_FILE="$1"
+    sudo tee "$TARGET_FILE" > /dev/null << 'EOF'
+#!/bin/sh
+
+userresources=$HOME/.Xresources
+usermodmap=$HOME/.Xmodmap
+sysresources=/etc/X11/xinit/.Xresources
+sysmodmap=/etc/X11/xinit/.Xmodmap
+
+if [ -f $sysresources ]; then xrdb -merge $sysresources; fi
+if [ -f $sysmodmap ]; then xmodmap $sysmodmap; fi
+if [ -f "$userresources" ]; then xrdb -merge "$userresources"; fi
+if [ -f "$usermodmap" ]; then xmodmap "$usermodmap"; fi
+
+exec startfluxbox
+EOF
+    sudo chmod +x "$TARGET_FILE"
+}
+
+create_xinitrc "/etc/skel/.xinitrc"
+create_xinitrc "$USER_HOME/.xinitrc"
+sudo chown "$REAL_USER:$REAL_USER" "$USER_HOME/.xinitrc"
+
+
+# ==========================================
+# 9. CONFIGURACIÓN DE SERVICIOS Y GRUB
 # ==========================================
 echo "==> Habilitando LightDM..."
 sudo systemctl enable lightdm.service
@@ -160,12 +290,13 @@ fi
 
 
 # ==========================================
-# 7. LIMPIEZA Y REINICIO
+# 10. LIMPIEZA Y REINICIO
 # ==========================================
 rm -rf ~/LinuxScripts
 
 echo "======================================================"
-echo " Instalación completada con éxito."
+echo " Instalación y configuración completadas con éxito."
+echo " Thunar, complementos y temas visuales aplicados."
 echo " Reiniciando el sistema en 5 segundos..."
 echo "======================================================"
 sleep 5
