@@ -156,7 +156,7 @@ sudo -u "$REAL_USER" yay -S --needed stacer-bin --noconfirm
 
 
 # ==========================================
-# 6. CONFIGURACIÓN DEL TEMA GTK Y DE ICONOS (CORREGIDO)
+# 6. CONFIGURACIÓN DEL TEMA GTK Y DE ICONOS (PERMISOS CORREGIDOS)
 # ==========================================
 echo "==> Aplicando configuración visual GTK (Arc-Dark + Papirus)..."
 
@@ -164,19 +164,19 @@ setup_gtk_theme() {
     local TARGET_HOME="$1"
     local TARGET_USER="$2"
 
-    # Asegurar directorio de configuración
-    mkdir -p "$TARGET_HOME/.config/gtk-3.0"
+    # Crear directorios con permisos elevados
+    sudo mkdir -p "$TARGET_HOME/.config/gtk-3.0"
 
-    # GTK 2.0
-    cat << 'EOF' > "$TARGET_HOME/.gtkrc-2.0"
+    # Escribir GTK 2.0 usando sudo tee para evitar problemas de permisos
+    sudo tee "$TARGET_HOME/.gtkrc-2.0" > /dev/null << 'EOF'
 gtk-theme-name="Arc-Dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Noto Sans 10"
 gtk-cursor-theme-name="Adwaita"
 EOF
 
-    # GTK 3.0
-    cat << 'EOF' > "$TARGET_HOME/.config/gtk-3.0/settings.ini"
+    # Escribir GTK 3.0
+    sudo tee "$TARGET_HOME/.config/gtk-3.0/settings.ini" > /dev/null << 'EOF'
 [Settings]
 gtk-theme-name=Arc-Dark
 gtk-icon-theme-name=Papirus-Dark
@@ -185,9 +185,9 @@ gtk-cursor-theme-name=Adwaita
 gtk-application-prefer-dark-theme=1
 EOF
 
-    # Ajustar permisos para el usuario
+    # Corregir la propiedad de los archivos si no es root
     if [ "$TARGET_USER" != "root" ]; then
-        chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.gtkrc-2.0" "$TARGET_HOME/.config"
+        sudo chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.gtkrc-2.0" "$TARGET_HOME/.config/gtk-3.0"
     fi
 }
 
@@ -195,7 +195,6 @@ EOF
 setup_gtk_theme "$USER_HOME" "$REAL_USER"
 
 # Configurar plantilla para /etc/skel
-sudo mkdir -p /etc/skel/.config/gtk-3.0
 setup_gtk_theme "/etc/skel" "root"
 
 
@@ -215,7 +214,7 @@ setup_fluxbox_user() {
     sudo -u "$TARGET_USER" mmaker -f FluxBox
 
     # Archivo de inicio (Startup)
-    cat << 'EOF' | sudo tee "$FLUX_DIR/startup" > /dev/null
+    sudo tee "$FLUX_DIR/startup" > /dev/null << 'EOF'
 #!/bin/sh
 
 # Iniciar compositor visual (sombras y transparencias)
@@ -248,7 +247,7 @@ echo "==> Configurando .xinitrc para iniciar Fluxbox con startx..."
 
 create_xinitrc() {
     local TARGET_FILE="$1"
-    cat << 'EOF' | sudo tee "$TARGET_FILE" > /dev/null
+    sudo tee "$TARGET_FILE" > /dev/null << 'EOF'
 #!/bin/sh
 
 userresources=$HOME/.Xresources
