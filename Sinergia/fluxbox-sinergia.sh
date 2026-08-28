@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Detener la ejecución si ocurre un error
-set -e
-
-# Identificar al usuario real si el script se ejecuta con sudo
-REAL_USER=${SUDO_USER:-$USER}
-USER_HOME=$(eval echo "~$REAL_USER")
-
 # ==========================================
 # 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
 # ==========================================
@@ -15,13 +8,15 @@ if [ ! -f /etc/pacman.conf.bak_repos ]; then
     sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
 fi
 
+# Agregar ILoveCandy y habilitar ParallelDownloads si no existen (CORREGIDO)
 echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
 if ! grep -q "^ILoveCandy" /etc/pacman.conf; then
+    # Inserta ILoveCandy justo debajo de la cabecera [options]
     sudo sed -i '/^\[options\]/a ILoveCandy' /etc/pacman.conf
 fi
 
 if grep -q "^#ParallelDownloads" /etc/pacman.conf; then
-    sudo sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/g' /etc/pacman.conf
+    sudo sed -i 's/^#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
 elif ! grep -q "^ParallelDownloads" /etc/pacman.conf; then
     sudo sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 fi
@@ -50,7 +45,7 @@ sudo pacman-key --recv-keys 149ABD0C3A0563EE --keyserver keys.openpgp.org
 sudo pacman-key --lsign-key 149ABD0C3A0563EE
 
 echo "==> Instalando kiro-keyring y kiro-mirrorlist..."
-sudo pacman -S --needed kiro-keyring kiro-mirrorlist --noconfirm
+sudo pacman -Sy --needed kiro-keyring kiro-mirrorlist --noconfirm
 
 echo "==> Actualizando pacman.conf para usar kiro-mirrorlist..."
 sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /etc/pacman.d/kiro-mirrorlist|g' /etc/pacman.conf
@@ -77,15 +72,18 @@ Include = /etc/pacman.d/chaotic-mirrorlist
 EOF'
 fi
 
-# Sincronizar bases de datos tras añadir todos los repositorios
+echo "==> Actualizando la base de datos de repositorios..."
 sudo pacman -Sy
 
 
-# ==========================================
-# 4. INSTALACIÓN DE PAQUETES DEL SISTEMA, THUNAR, FLUXBOX Y TEMAS GTK
-# ==========================================
-echo "==> Instalando paquetes base, Thunar, Fluxbox y software del sistema..."
-sudo pacman -S --noconfirm --needed \
+# Exit on error (si un comando falla, el script se detiene por seguridad)
+set -e
+
+# 3. Actualizar las bases de datos de repositorios
+sudo pacman -Sy --noconfirm
+
+# 4. Instalar TDE y el resto de los paquetes
+sudo pacman -S --noconfirm \
   fluxbox \
   menumaker \
   picom \
@@ -95,7 +93,6 @@ sudo pacman -S --noconfirm --needed \
   thunar \
   thunar-archive-plugin \
   thunar-volman \
-  tumbler \
   xorg-server \
   xorg-xinit \
   xorg-xmessage \
@@ -131,166 +128,38 @@ sudo pacman -S --noconfirm --needed \
   octopi \
   lightdm \
   lightdm-gtk-greeter \
+  ttf-dejavu \
+  xorg-fonts-misc \
+  imlib2 \
+  hsetroot \
   os-prober
 
-
 # ==========================================
-# 5. INSTALACIÓN DE YAY Y PAQUETES AUR
+# . INSTALACIÓN DE YAY Y PAQUETES AUR
 # ==========================================
 echo "==> Asegurando base-devel e instalando YAY..."
 sudo pacman -S --needed base-devel git --noconfirm
 
-# Compilar YAY con el usuario no-root
-BUILD_DIR=$(mktemp -d)
-sudo chown -R "$REAL_USER:$REAL_USER" "$BUILD_DIR"
+rm -rf yay
+git clone https://aur.archlinux.org/yay.git
+cd yay || exit
+makepkg -si --noconfirm
+cd ..
+rm -rf yay
 
-sudo -u "$REAL_USER" bash -c "
-  git clone https://aur.archlinux.org/yay.git '$BUILD_DIR/yay'
-  cd '$BUILD_DIR/yay'
-  makepkg -si --noconfirm
-"
-rm -rf "$BUILD_DIR"
+echo "==> Instalando paquetes adicionales..."
+yay -S stacer-bin fluxmod-styles --noconfirm
 
-echo "==> Instalando paquetes de AUR con YAY..."
-sudo -u "$REAL_USER" yay -S --needed stacer-bin --noconfirm
+# 5. Configurar GRUB para detectar otros sistemas operativos
+sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-
-# ==========================================
-# 6. CONFIGURACIÓN DEL TEMA GTK Y DE ICONOS (PERMISOS CORREGIDOS)
-# ==========================================
-echo "==> Aplicando configuración visual GTK (Arc-Dark + Papirus)..."
-
-setup_gtk_theme() {
-    local TARGET_HOME="$1"
-    local TARGET_USER="$2"
-
-    # Crear directorios con permisos elevados
-    sudo mkdir -p "$TARGET_HOME/.config/gtk-3.0"
-
-    # Escribir GTK 2.0 usando sudo tee para evitar problemas de permisos
-    sudo tee "$TARGET_HOME/.gtkrc-2.0" > /dev/null << 'EOF'
-gtk-theme-name="Arc-Dark"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 10"
-gtk-cursor-theme-name="Adwaita"
-EOF
-
-    # Escribir GTK 3.0
-    sudo tee "$TARGET_HOME/.config/gtk-3.0/settings.ini" > /dev/null << 'EOF'
-[Settings]
-gtk-theme-name=Arc-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 10
-gtk-cursor-theme-name=Adwaita
-gtk-application-prefer-dark-theme=1
-EOF
-
-    # Corregir la propiedad de los archivos si no es root
-    if [ "$TARGET_USER" != "root" ]; then
-        sudo chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.gtkrc-2.0" "$TARGET_HOME/.config/gtk-3.0"
-    fi
-}
-
-# Aplicar al usuario actual
-setup_gtk_theme "$USER_HOME" "$REAL_USER"
-
-# Configurar plantilla para /etc/skel
-setup_gtk_theme "/etc/skel" "root"
-
-
-# ==========================================
-# 7. CONFIGURACIÓN DE FLUXBOX Y MENÚ DE APLICACIONES
-# ==========================================
-echo "==> Estructurando configuración de Fluxbox..."
-
-setup_fluxbox_user() {
-    local TARGET_HOME="$1"
-    local TARGET_USER="$2"
-    local FLUX_DIR="$TARGET_HOME/.fluxbox"
-
-    sudo -u "$TARGET_USER" mkdir -p "$FLUX_DIR"
-
-    # Generar menú dinámico de aplicaciones
-    sudo -u "$TARGET_USER" mmaker -f FluxBox
-
-    # Archivo de inicio (Startup)
-    sudo tee "$FLUX_DIR/startup" > /dev/null << 'EOF'
-#!/bin/sh
-
-# Iniciar compositor visual (sombras y transparencias)
-picom -b &
-
-# Fondo de pantalla neutro
-feh --bg-fill /usr/share/backgrounds/archlinux/simple.png 2>/dev/null || xsetroot -solid "#1e1e2e" &
-
-# Iniciar Ulauncher en segundo plano
-ulauncher --hide-window &
-
-# Ejecutar Fluxbox
-exec fluxbox
-EOF
-
-    sudo chmod +x "$FLUX_DIR/startup"
-    sudo chown -R "$TARGET_USER:$TARGET_USER" "$FLUX_DIR"
-}
-
-setup_fluxbox_user "$USER_HOME" "$REAL_USER"
-
-sudo mkdir -p /etc/skel/.fluxbox
-sudo mmaker -f FluxBox --output /etc/skel/.fluxbox/menu
-
-
-# ==========================================
-# 8. CONFIGURACIÓN DE ENTORNO X11 (.xinitrc)
-# ==========================================
-echo "==> Configurando .xinitrc para iniciar Fluxbox con startx..."
-
-create_xinitrc() {
-    local TARGET_FILE="$1"
-    sudo tee "$TARGET_FILE" > /dev/null << 'EOF'
-#!/bin/sh
-
-userresources=$HOME/.Xresources
-usermodmap=$HOME/.Xmodmap
-sysresources=/etc/X11/xinit/.Xresources
-sysmodmap=/etc/X11/xinit/.Xmodmap
-
-if [ -f $sysresources ]; then xrdb -merge $sysresources; fi
-if [ -f $sysmodmap ]; then xmodmap $sysmodmap; fi
-if [ -f "$userresources" ]; then xrdb -merge "$userresources"; fi
-if [ -f "$usermodmap" ]; then xmodmap "$usermodmap"; fi
-
-exec startfluxbox
-EOF
-    sudo chmod +x "$TARGET_FILE"
-}
-
-create_xinitrc "/etc/skel/.xinitrc"
-create_xinitrc "$USER_HOME/.xinitrc"
-sudo chown "$REAL_USER:$REAL_USER" "$USER_HOME/.xinitrc"
-
-
-# ==========================================
-# 9. CONFIGURACIÓN DE SERVICIOS Y GRUB
-# ==========================================
-echo "==> Habilitando LightDM..."
+# 6. Habilitar el gestor de inicio de TDE
 sudo systemctl enable lightdm.service
 
-echo "==> Configurando GRUB para detectar otros SO..."
-if [ -f /etc/default/grub ]; then
-    sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
-    sudo grub-mkconfig -o /boot/grub/grub.cfg
-fi
-
-
-# ==========================================
-# 10. LIMPIEZA Y REINICIO
-# ==========================================
+# 7. Limpieza opcional
 rm -rf ~/LinuxScripts
 
-echo "======================================================"
-echo " Instalación y configuración completadas con éxito."
-echo " Reiniciando el sistema en 5 segundos..."
-echo "======================================================"
-sleep 5
+# 8. Reiniciar
+echo "Instalación completada. Reiniciando el sistema..."
 sudo reboot
