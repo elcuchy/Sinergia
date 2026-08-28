@@ -156,7 +156,7 @@ sudo -u "$REAL_USER" yay -S --needed stacer-bin --noconfirm
 
 
 # ==========================================
-# 6. CONFIGURACIÓN DEL TEMA GTK Y DE ICONOS
+# 6. CONFIGURACIÓN DEL TEMA GTK Y DE ICONOS (CORREGIDO)
 # ==========================================
 echo "==> Aplicando configuración visual GTK (Arc-Dark + Papirus)..."
 
@@ -164,8 +164,11 @@ setup_gtk_theme() {
     local TARGET_HOME="$1"
     local TARGET_USER="$2"
 
+    # Asegurar directorio de configuración
+    mkdir -p "$TARGET_HOME/.config/gtk-3.0"
+
     # GTK 2.0
-    sudo -u "$TARGET_USER" tee "$TARGET_HOME/.gtkrc-2.0" > /dev/null << 'EOF'
+    cat << 'EOF' > "$TARGET_HOME/.gtkrc-2.0"
 gtk-theme-name="Arc-Dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Noto Sans 10"
@@ -173,8 +176,7 @@ gtk-cursor-theme-name="Adwaita"
 EOF
 
     # GTK 3.0
-    sudo -u "$TARGET_USER" mkdir -p "$TARGET_HOME/.config/gtk-3.0"
-    sudo -u "$TARGET_USER" tee "$TARGET_HOME/.config/gtk-3.0/settings.ini" > /dev/null << 'EOF'
+    cat << 'EOF' > "$TARGET_HOME/.config/gtk-3.0/settings.ini"
 [Settings]
 gtk-theme-name=Arc-Dark
 gtk-icon-theme-name=Papirus-Dark
@@ -182,6 +184,11 @@ gtk-font-name=Noto Sans 10
 gtk-cursor-theme-name=Adwaita
 gtk-application-prefer-dark-theme=1
 EOF
+
+    # Ajustar permisos para el usuario
+    if [ "$TARGET_USER" != "root" ]; then
+        chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.gtkrc-2.0" "$TARGET_HOME/.config"
+    fi
 }
 
 # Aplicar al usuario actual
@@ -189,19 +196,7 @@ setup_gtk_theme "$USER_HOME" "$REAL_USER"
 
 # Configurar plantilla para /etc/skel
 sudo mkdir -p /etc/skel/.config/gtk-3.0
-sudo tee /etc/skel/.gtkrc-2.0 > /dev/null << 'EOF'
-gtk-theme-name="Arc-Dark"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 10"
-EOF
-
-sudo tee /etc/skel/.config/gtk-3.0/settings.ini > /dev/null << 'EOF'
-[Settings]
-gtk-theme-name=Arc-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 10
-gtk-application-prefer-dark-theme=1
-EOF
+setup_gtk_theme "/etc/skel" "root"
 
 
 # ==========================================
@@ -220,7 +215,7 @@ setup_fluxbox_user() {
     sudo -u "$TARGET_USER" mmaker -f FluxBox
 
     # Archivo de inicio (Startup)
-    sudo tee "$FLUX_DIR/startup" > /dev/null << 'EOF'
+    cat << 'EOF' | sudo tee "$FLUX_DIR/startup" > /dev/null
 #!/bin/sh
 
 # Iniciar compositor visual (sombras y transparencias)
@@ -253,7 +248,7 @@ echo "==> Configurando .xinitrc para iniciar Fluxbox con startx..."
 
 create_xinitrc() {
     local TARGET_FILE="$1"
-    sudo tee "$TARGET_FILE" > /dev/null << 'EOF'
+    cat << 'EOF' | sudo tee "$TARGET_FILE" > /dev/null
 #!/bin/sh
 
 userresources=$HOME/.Xresources
@@ -296,7 +291,6 @@ rm -rf ~/LinuxScripts
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Thunar, complementos y temas visuales aplicados."
 echo " Reiniciando el sistema en 5 segundos..."
 echo "======================================================"
 sleep 5
