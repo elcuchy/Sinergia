@@ -177,7 +177,6 @@ rm -rf "$BUILD_DIR"
 
 echo "==> Instalando xfce4-panel-profiles y paquetes AUR..."
 sudo -u "$REAL_USER" yay -S --needed --noconfirm \
-  xfce4-panel-profiles-git \
   stacer-bin \
   sinergia-dd-burner \
   aimp \
