@@ -90,6 +90,7 @@ sudo pacman -S --noconfirm --needed \
   xorg-apps \
   xfce4 \
   xfce4-goodies \
+  xfce4-panel-profiles \
   python-gobject \
   dbus \
   lightdm \
