@@ -158,9 +158,12 @@ echo "==> Generando el menú de Fluxbox con menumaker..."
 mkdir -p "$HOME/.fluxbox"
 
 # mmaker escanea los .desktop instalados y arma el menú.
-# -f fuerza sobrescritura, -i agrega iconos, "fluxbox" indica el entorno destino.
+# -f fuerza sobrescritura, "fluxbox" indica el entorno destino.
+# NOTA: -i (iconos) requiere usarse junto con -c (menú custom), si no menumaker
+# lo rechaza para evitar pisar un menú personalizado por error. Como acá es una
+# instalación limpia sin menú custom previo, no hace falta -i.
 # Se corre SIN sudo: el menú debe quedar en el home del usuario, no en el de root.
-mmaker -f -i fluxbox
+mmaker -f fluxbox
 
 # Si por algún motivo mmaker no escribió en la ruta esperada, lo movemos.
 if [ -f "$HOME/menu" ] && [ ! -f "$HOME/.fluxbox/menu" ]; then
