@@ -150,6 +150,25 @@ rm -rf yay
 echo "==> Instalando paquetes adicionales..."
 yay -S stacer-bin fluxmod-styles --noconfirm
 
+# ==========================================
+# 4b. GENERACIÓN DEL MENÚ DE FLUXBOX
+# ==========================================
+echo "==> Generando el menú de Fluxbox con menumaker..."
+# Aseguramos que exista ~/.fluxbox (por si fluxbox nunca se inició antes)
+mkdir -p "$HOME/.fluxbox"
+
+# mmaker escanea los .desktop instalados y arma el menú.
+# -f fuerza sobrescritura, -i agrega iconos, "fluxbox" indica el entorno destino.
+# Se corre SIN sudo: el menú debe quedar en el home del usuario, no en el de root.
+mmaker -f -i fluxbox
+
+# Si por algún motivo mmaker no escribió en la ruta esperada, lo movemos.
+if [ -f "$HOME/menu" ] && [ ! -f "$HOME/.fluxbox/menu" ]; then
+    mv "$HOME/menu" "$HOME/.fluxbox/menu"
+fi
+
+echo "==> Menú de Fluxbox generado en \$HOME/.fluxbox/menu"
+
 # 5. Configurar GRUB para detectar otros sistemas operativos
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
 sudo grub-mkconfig -o /boot/grub/grub.cfg
