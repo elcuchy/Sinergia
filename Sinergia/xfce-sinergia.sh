@@ -86,6 +86,14 @@ sudo pacman -S --noconfirm \
   xorg-apps \
   xfce4 \
   xfce4-goodies \
+  xfce4-panel-profiles \
+  xfce4-whiskermenu-plugin \
+  xfce4-docklike-plugin \
+  xfce4-windowck-plugin \
+  xfce4-places-plugin \
+  plank \
+  python-gobject \
+  dbus \
   lightdm \
   lightdm-gtk-greeter \
   pipewire-pulse \
