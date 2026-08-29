@@ -1,0 +1,376 @@
+#!/bin/bash
+
+# Exit on error (si un comando falla, el script se detiene por seguridad)
+set -e
+
+# Identificar usuario real (en caso de ejecutar con sudo)
+REAL_USER=${SUDO_USER:-$USER}
+USER_HOME=$(eval echo "~$REAL_USER")
+
+# ==========================================
+# 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
+# ==========================================
+if [ ! -f /etc/pacman.conf.bak_repos ]; then
+    echo "==> Creando respaldo de /etc/pacman.conf..."
+    sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
+fi
+
+echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
+if ! grep -q "^ILoveCandy" /etc/pacman.conf; then
+    sudo sed -i '/^\[options\]/a ILoveCandy' /etc/pacman.conf
+fi
+
+if grep -q "^#ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/g' /etc/pacman.conf
+elif ! grep -q "^ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
+fi
+
+
+# ==========================================
+# 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
+# ==========================================
+echo "==> Configurando el repositorio nemesis_repo..."
+
+if ! grep -q "\[nemesis_repo\]" /etc/pacman.conf; then
+    echo "==> Agregando repositorio temporal nemesis_repo para bootstrap..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[nemesis_repo]
+Server = https://erikdubois.github.io/\$repo/\$arch
+EOF'
+fi
+
+sudo pacman -Sy
+
+echo "==> Importando clave PGP de Kiro (149ABD0C3A0563EE)..."
+sudo pacman-key --recv-keys 149ABD0C3A0563EE --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-keys 149ABD0C3A0563EE --keyserver keys.openpgp.org
+
+sudo pacman-key --lsign-key 149ABD0C3A0563EE
+
+echo "==> Instalando kiro-keyring y kiro-mirrorlist..."
+sudo pacman -Sy --needed kiro-keyring kiro-mirrorlist --noconfirm
+
+echo "==> Actualizando pacman.conf para usar kiro-mirrorlist..."
+sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /etc/pacman.d/kiro-mirrorlist|g' /etc/pacman.conf
+
+
+# ==========================================
+# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# ==========================================
+echo "==> Configurando el repositorio Chaotic-AUR..."
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
+sudo pacman-key --lsign-key 3056513887B78AEB
+
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF'
+fi
+
+echo "==> Actualizando la base de datos de repositorios..."
+sudo pacman -Sy
+
+
+# ==========================================
+# 4. INSTALACIÓN DE PAQUETES OFICIALES Y CHAOTIC-AUR
+# ==========================================
+echo "==> Instalando XFCE, aplicaciones, dependencias y paquetes del sistema..."
+sudo pacman -S --noconfirm --needed \
+  xorg-server \
+  xorg-apps \
+  xfce4 \
+  xfce4-goodies \
+  xfce4-panel-profiles \
+  xfce4-whiskermenu-plugin \
+  xfce4-docklike-plugin \
+  xfce4-windowck-plugin \
+  xfce4-places-plugin \
+  plank \
+  python-gobject \
+  dbus \
+  lightdm \
+  lightdm-gtk-greeter \
+  pipewire-pulse \
+  wireplumber \
+  pavucontrol \
+  network-manager-applet \
+  amd-ucode \
+  intel-ucode \
+  atril \
+  vlc \
+  unrar \
+  p7zip \
+  chromium \
+  firefox \
+  firefox-i18n-es-ar \
+  libreoffice-fresh-es \
+  hunspell-es_uy \
+  telegram-desktop \
+  zsh \
+  zsh-completions \
+  fastfetch \
+  ntfs-3g \
+  archlinux-tweak-tool-gtk4 \
+  terminology \
+  vlc-plugins-all \
+  hardinfo2 \
+  mpv \
+  btop \
+  gparted \
+  nano \
+  ulauncher \
+  audacious \
+  pamac-aur \
+  gvfs-dnssd \
+  gvfs-wsdd \
+  rygel \
+  tracker3-miners \
+  gvfs \
+  gvfs-afc \
+  gvfs-gphoto2 \
+  gvfs-mtp \
+  gvfs-nfs \
+  gvfs-smb \
+  transmission-gtk \
+  xarchiver \
+  mousepad \
+  xfce4-taskmanager \
+  xfce4-screenshooter \
+  obs-studio \
+  audacity \
+  ardour \
+  kdenlive \
+  ventoy \
+  papirus-icon-theme \
+  mint-l-icons \
+  mint-x-icons \
+  mint-y-icons \
+  mate-icon-theme-faenza \
+  rustdesk-bin \
+  gnome-boxes \
+  amber-theme-git \
+  arc-gtk-theme \
+  colloid-gtk-theme-git \
+  graphite-gtk-theme-black-normal-git \
+  os-prober
+
+# NOTA: xfce4-whiskermenu-plugin, xfce4-docklike-plugin y xfce4-windowck-plugin
+# son requeridos por varios de los layouts que trae xfce4-panel-profiles
+# (Redmond, Redmond 7, Cupertino, Unity). Sin ellos, esos perfiles cargan
+# incompletos o directamente fallan al aplicarse. "plank" se agrega porque
+# el layout Cupertino (estilo macOS) espera un dock tipo plank disponible.
+
+
+# ==========================================
+# 5. INSTALACIÓN DE YAY Y PAQUETES AUR
+# ==========================================
+echo "==> Asegurando base-devel e instalando YAY..."
+sudo pacman -S --needed base-devel git --noconfirm
+
+BUILD_DIR=$(mktemp -d)
+sudo chown -R "$REAL_USER:$REAL_USER" "$BUILD_DIR"
+
+sudo -u "$REAL_USER" bash -c "
+  git clone https://aur.archlinux.org/yay.git '$BUILD_DIR/yay'
+  cd '$BUILD_DIR/yay'
+  makepkg -si --noconfirm
+"
+rm -rf "$BUILD_DIR"
+
+echo "==> Instalando paquetes AUR adicionales..."
+sudo -u "$REAL_USER" yay -S --needed --noconfirm \
+  stacer-bin \
+  sinergia-dd-burner \
+  aimp \
+  iptvnator-bin \
+  yaru-colors-icon-theme \
+  fetch-git
+
+
+# ==========================================
+# 6. CONFIGURACIÓN DE APARIENCIA Y ENTORNO
+# ==========================================
+echo "==> Personalizando apariencia (Graphite-Dark, Yaru-MATE, Transparencia)..."
+
+apply_user_configs() {
+    local TARGET_DIR="$1"
+    local USER_NAME="$2"
+
+    # Directorios base
+    sudo mkdir -p "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml"
+    sudo mkdir -p "$TARGET_DIR/xfce4/terminal"
+    sudo mkdir -p "$TARGET_DIR/gtk-3.0"
+    sudo mkdir -p "$TARGET_DIR/gtk-4.0"
+
+    # 1. Configuración del Tema y los Íconos en XFCE
+    sudo tee "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml" > /dev/null << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="Graphite-Dark"/>
+    <property name="IconThemeName" type="string" value="Yaru-MATE"/>
+  </property>
+  <property name="Gtk" type="empty">
+    <property name="CursorThemeName" type="string" value="Yaru"/>
+  </property>
+</channel>
+EOF
+
+    # 2. Transparencia por defecto en XFCE Terminal
+    sudo tee "$TARGET_DIR/xfce4/terminal/terminalrc" > /dev/null << 'EOF'
+[Configuration]
+BackgroundMode=TERMINAL_BACKGROUND_TRANSPARENT
+BackgroundDarkness=0.85
+EOF
+
+    # 3. Extender tema oscuro a apps GTK3/GTK4
+    sudo tee "$TARGET_DIR/gtk-3.0/settings.ini" > /dev/null << 'EOF'
+[Settings]
+gtk-theme-name=Graphite-Dark
+gtk-icon-theme-name=Yaru-MATE
+gtk-application-prefer-dark-theme=1
+EOF
+
+    sudo tee "$TARGET_DIR/gtk-4.0/settings.ini" > /dev/null << 'EOF'
+[Settings]
+gtk-theme-name=Graphite-Dark
+gtk-icon-theme-name=Yaru-MATE
+gtk-application-prefer-dark-theme=1
+EOF
+
+    # Ajustar permisos de la estructura
+    if [ "$USER_NAME" != "root" ]; then
+        sudo chown -R "$USER_NAME:$USER_NAME" "$TARGET_DIR"
+    fi
+}
+
+# Aplicar a /etc/skel y al usuario actual
+apply_user_configs "/etc/skel/.config" "root"
+apply_user_configs "$USER_HOME/.config" "$REAL_USER"
+
+# Configuración del tema para aplicaciones QT con privilegios elevados
+if ! grep -q "QT_QPA_PLATFORMTHEME" /etc/environment; then
+    echo "QT_QPA_PLATFORMTHEME=qt5ct" | sudo tee -a /etc/environment
+fi
+
+
+# ==========================================
+# 7. APLICACIÓN DEL PERFIL REDMOND 7
+# ==========================================
+echo "==> Cargando el perfil Redmond 7 en el usuario $REAL_USER..."
+
+# El nombre exacto de archivo puede variar según el paquete (algunos lo
+# empaquetan como "redmond7.tar.bz2", otros como "Redmond 7.tar.bz2").
+# Probamos las variantes más comunes en orden.
+LAYOUT_FILE=""
+for candidate in \
+    "/usr/share/xfce4-panel-profiles/layouts/redmond7.tar.bz2" \
+    "/usr/share/xfce4-panel-profiles/layouts/redmond-7.tar.bz2" \
+    "/usr/share/xfce4-panel-profiles/layouts/Redmond 7.tar.bz2"; do
+    if [ -f "$candidate" ]; then
+        LAYOUT_FILE="$candidate"
+        break
+    fi
+done
+
+# Función que fija el icono del whisker menu (button-icon) en el
+# xfce4-panel.xml ya extraído, para el plugin cuyo tipo sea "whiskermenu".
+set_whisker_icon() {
+    local PANEL_XML="$1/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+    if [ -f "$PANEL_XML" ]; then
+        sudo python3 - "$PANEL_XML" << 'PYEOF'
+import sys
+import xml.etree.ElementTree as ET
+
+path = sys.argv[1]
+tree = ET.parse(path)
+root = tree.getroot()
+
+plugins = root.find(".//property[@name='plugins']")
+if plugins is not None:
+    for plugin in plugins.findall("property"):
+        if plugin.get("name", "").startswith("plugin-") and plugin.get("value") == "whiskermenu":
+            icon_prop = None
+            for child in plugin.findall("property"):
+                if child.get("name") == "button-icon":
+                    icon_prop = child
+                    break
+            if icon_prop is None:
+                icon_prop = ET.SubElement(plugin, "property")
+                icon_prop.set("name", "button-icon")
+                icon_prop.set("type", "string")
+            icon_prop.set("value", "archlinux-logo")
+
+tree.write(path, encoding="UTF-8", xml_declaration=True)
+PYEOF
+    fi
+}
+
+if [ -n "$LAYOUT_FILE" ]; then
+    # Intento 1: aplicar en caliente vía D-Bus (funciona si hay una sesión activa)
+    sudo -u "$REAL_USER" dbus-run-session bash -c \
+      "xfce4-panel-profiles load '$LAYOUT_FILE'" || true
+
+    # Intento 2 (respaldo garantizado): extraer el layout directamente en la
+    # configuración del usuario actual, no solo en /etc/skel. Esto asegura
+    # que el perfil quede aplicado aunque el paso anterior por D-Bus falle
+    # silenciosamente (algo común antes del primer login gráfico).
+    sudo mkdir -p "$USER_HOME/.config/xfce4"
+    sudo tar -xjf "$LAYOUT_FILE" -C "$USER_HOME/.config/xfce4/" --strip-components=1 2>/dev/null || true
+    set_whisker_icon "$USER_HOME/.config"
+
+    # También se extrae en /etc/skel para que futuros usuarios hereden Redmond 7
+    sudo mkdir -p /etc/skel/.config/xfce4
+    sudo tar -xjf "$LAYOUT_FILE" -C /etc/skel/.config/xfce4/ --strip-components=1 2>/dev/null || true
+    set_whisker_icon "/etc/skel/.config"
+else
+    echo "==> Advertencia: No se encontró el archivo de layout Redmond 7. Verificá el nombre real con:"
+    echo "    ls /usr/share/xfce4-panel-profiles/layouts/"
+fi
+
+# NOTA: "archlinux-logo" es el nombre de ícono que suelen usar temas como
+# Papirus para el logo de Arch. Si en tu sistema no aparece el logo (icono
+# roto/genérico), el tema activo probablemente lo llama distinto. Verificá con:
+#   find /usr/share/icons -iname "*archlinux*" 2>/dev/null
+# y si el nombre real es otro (ej. "distributor-logo-archlinux"), reemplazá
+# "archlinux-logo" por ese nombre en la función set_whisker_icon() de arriba.
+
+# Ajustar permisos finales
+sudo chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config"
+
+
+# ==========================================
+# 8. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
+# ==========================================
+echo "==> Configurando LightDM con GTK Greeter..."
+sudo sed -i 's/#\?greeter-session=.*/greeter-session=lightdm-gtk-greeter/' /etc/lightdm/lightdm.conf
+sudo systemctl enable lightdm
+
+echo "==> Configurando GRUB para detectar otros SO..."
+if [ -f /etc/default/grub ]; then
+    sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
+    sudo grub-mkconfig -o /boot/grub/grub.cfg
+fi
+
+
+# ==========================================
+# 9. LIMPIEZA Y REINICIO
+# ==========================================
+rm -rf ~/LinuxScripts
+
+echo "======================================================"
+echo " Instalación y configuración completadas con éxito."
+echo " Reiniciando el sistema en 5 segundos..."
+echo "======================================================"
+sleep 5
+sudo reboot
