@@ -103,7 +103,6 @@ sudo pacman -S --noconfirm --needed \
   evisum \
   rage \
   packagekit \
-  extra-hd-wallpapers \
   amd-ucode \
   intel-ucode \
   atril \
