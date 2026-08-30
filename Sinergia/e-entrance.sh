@@ -92,19 +92,18 @@ sudo pacman -Sy
 # ==========================================
 # 4. INSTALACIÓN DE PAQUETES OFICIALES Y CHAOTIC-AUR
 # ==========================================
-# Nota: se sacaron lightdm y lightdm-slick-greeter porque el display manager
-# por defecto ahora es Entrance (se instala y habilita en la sección 6).
-echo "==> Instalando Enlightenment, aplicaciones, dependencias y paquetes del sistema..."
+echo "==> Instalando Enlightenment, LightDM, aplicaciones, dependencias y paquetes del sistema..."
 sudo pacman -S --noconfirm --needed \
   enlightenment \
+  lightdm \
+  lightdm-slick-greeter \
   connman \
-  bluez \
-  thunar \
   ecrire \
   ephoto \
   evisum \
   rage \
   packagekit \
+  extra-hd-wallpapers \
   amd-ucode \
   intel-ucode \
   atril \
@@ -177,30 +176,30 @@ else
     rm -rf "$BUILD_DIR"
 fi
 
-echo "==> Instalando paquetes AUR adicionales (incluye Entrance)..."
+echo "==> Instalando paquetes AUR adicionales..."
 sudo -u "$REAL_USER" yay -S --needed --noconfirm \
   stacer-bin \
   sinergia-dd-burner \
   aimp \
   iptvnator-bin \
   yaru-colors-icon-theme \
-  entrance-git \
   fetch-git
 
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
-echo "==> Configurando Entrance como display manager por defecto..."
+echo "==> Configurando LightDM con Slick Greeter como display manager por defecto..."
 
-# Si LightDM (u otro DM) está habilitado, lo deshabilitamos para evitar conflictos
-for dm in lightdm gdm sddm; do
+# Si hay otro DM habilitado, lo deshabilitamos para evitar conflictos
+for dm in entrance gdm sddm; do
     if systemctl is-enabled "$dm" &>/dev/null; then
         echo "==> Deshabilitando $dm..."
         sudo systemctl disable "$dm"
     fi
 done
 
-sudo systemctl enable entrance.service
+sudo sed -i 's/#\?greeter-session=.*/greeter-session=lightdm-slick-greeter/' /etc/lightdm/lightdm.conf
+sudo systemctl enable lightdm
 sudo systemctl enable connman
 
 echo "==> Configurando GRUB para detectar otros SO..."
@@ -217,7 +216,7 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: Entrance"
+echo " Display manager configurado: LightDM (Slick Greeter)"
 echo "======================================================"
 
 read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
