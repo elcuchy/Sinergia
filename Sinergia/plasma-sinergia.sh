@@ -132,27 +132,19 @@ sudo pacman -S --noconfirm --needed \
 # ==========================================
 # 5. INSTALACIÓN DE YAY Y PAQUETES AUR
 # ==========================================
+
 echo "==> Asegurando base-devel e instalando YAY..."
 sudo pacman -S --needed base-devel git --noconfirm
 
-if command -v yay >/dev/null 2>&1; then
-    echo "==> yay ya está instalado, se omite la compilación."
-else
-    BUILD_DIR=$(mktemp -d)
-    sudo chown -R "$REAL_USER:$REAL_USER" "$BUILD_DIR"
+rm -rf yay
+git clone https://aur.archlinux.org/yay.git
+cd yay || exit
+makepkg -si --noconfirm
+cd ..
+rm -rf yay
 
-    sudo -u "$REAL_USER" bash -c "
-      git clone https://aur.archlinux.org/yay.git '$BUILD_DIR/yay'
-      cd '$BUILD_DIR/yay'
-      makepkg -si --noconfirm
-    "
-    rm -rf "$BUILD_DIR"
-fi
-
-echo "==> Instalando paquetes AUR adicionales..."
-sudo -u "$REAL_USER" yay -S --needed --noconfirm \
-  stacer-bin \
-
+echo "==> Instalando paquetes adicionales..."
+yay -S stacer-bin --noconfirm
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
