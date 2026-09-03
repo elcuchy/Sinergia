@@ -121,7 +121,7 @@ sudo pacman -S --noconfirm --needed \
   btop \
   gparted \
   nano \
-  pamac-aur \
+  shelly \
   ark \
   powerdevil \
   plasma-systemmonitor \
