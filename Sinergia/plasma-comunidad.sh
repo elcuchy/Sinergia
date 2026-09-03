@@ -92,11 +92,10 @@ sudo pacman -Sy
 # ==========================================
 # 4. INSTALACIÓN DE PAQUETES OFICIALES Y CHAOTIC-AUR
 # ==========================================
-echo "==> Instalando Plasma, sddm, aplicaciones, dependencias y paquetes del sistema..."
+echo "==> Instalando Plasma, Plasma Login Manager, aplicaciones, dependencias y paquetes del sistema..."
 sudo pacman -S --noconfirm --needed \
   plasma \
-  sddm \
-  sddm-kcm \
+  plasma-login-manager \
   amd-ucode \
   intel-ucode \
   okular \
@@ -163,17 +162,17 @@ yay -S stacer-bin --noconfirm
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
-echo "==> Configurando sddm como display manager por defecto..."
+echo "==> Configurando Plasma Login Manager como display manager por defecto..."
 
 # Si hay otro DM habilitado, lo deshabilitamos para evitar conflictos
-for dm in entrance gdm lightdm; do
+for dm in entrance gdm lightdm sddm; do
     if systemctl is-enabled "$dm" &>/dev/null; then
         echo "==> Deshabilitando $dm..."
         sudo systemctl disable "$dm"
     fi
 done
 
-sudo systemctl enable sddm
+sudo systemctl enable plasmalogin
 
 echo "==> Configurando GRUB para detectar otros SO..."
 if [ -f /etc/default/grub ]; then
@@ -211,7 +210,7 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: SDDM"
+echo " Display manager configurado: Plasma Login Manager"
 echo " KDE Wallet: desactivado por defecto"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
