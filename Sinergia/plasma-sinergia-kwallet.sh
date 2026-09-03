@@ -213,12 +213,14 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: SDDM"
 echo " KDE Wallet: desactivado por defecto"
-echo "  ____  _                          _       
-/ ___|(_)_ __   ___ _ __ __ _(_) __ _ 
-\___ \| | '_ \ / _ \ '__/ _` | |/ _` |
- ___) | | | | |  __/ | | (_| | | (_| |
-|____/|_|_| |_|\___|_|  \__, |_|\__,_|
-                        |___/"
+echo "  
+ SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
+S        I    NN  N  E      R   R  G   G    I    A   A
+S        I    N N N  E      R   R  G        I    A   A
+ SSS     I    N N N  EEEE   RRRR   G GGG    I    AAAAA
+    S    I    N  NN  E      R R    G   G    I    A   A
+    S    I    N   N  E      R  R   G   G    I    A   A
+SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
 echo "======================================================"
 
 read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
