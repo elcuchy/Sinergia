@@ -132,8 +132,8 @@ sudo pacman -S --noconfirm --needed \
 # ==========================================
 # 4.1 DESINSTALACIÓN DE PAQUETES NO DESEADOS
 # ==========================================
-echo "==> Desinstalando alacritty y discover..."
-for pkg in alacritty discover; do
+echo "==> Desinstalando discover..."
+for pkg in discover; do
     if pacman -Qi "$pkg" &>/dev/null; then
         echo "==> Eliminando $pkg..."
         sudo pacman -Rns --noconfirm "$pkg"
