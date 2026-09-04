@@ -188,7 +188,7 @@ if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/L4ki/Gently.git "
         sudo -u "$REAL_USER" mkdir -p "$LOOKANDFEEL_DIR"
         sudo -u "$REAL_USER" cp -r "$THEME_SRC" "$LOOKANDFEEL_DIR/Gently-Dark-Global-6"
 
-        THEME_ID=$(grep -m1 "^X-KDE-PluginInfo-Name=" "$LOOKANDFEEL_DIR/Gently-Dark-Global-6/metadata.desktop" 2>/dev/null | cut -d'=' -f2)
+        THEME_ID=$(grep -m1 "^X-KDE-PluginInfo-Name=" "$LOOKANDFEEL_DIR/Gently-Dark-Global-6/metadata.desktop" 2>/dev/null | cut -d'=' -f2 || true)
         THEME_ID=${THEME_ID:-Gently-Dark-Global-6}
 
         if command -v plasma-apply-lookandfeel &>/dev/null; then
