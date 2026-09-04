@@ -211,7 +211,7 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: SDDM"
+echo " Display manager configurado: Plasma Login Manager"
 echo " KDE Wallet: desactivado por defecto"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
@@ -221,6 +221,8 @@ S        I    N N N  E      R   R  G        I    A   A
     S    I    N  NN  E      R R    G   G    I    A   A
     S    I    N   N  E      R  R   G   G    I    A   A
 SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
+echo "======================================================"
+echo "            COMUNIDAD    LINUXERA"
 echo "======================================================"
 
 read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
