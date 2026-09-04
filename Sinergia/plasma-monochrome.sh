@@ -208,7 +208,7 @@ if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/pwyde/monochrome-
 
     # Detectar el Tema Global instalado para aplicarlo/fijarlo por defecto
     LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-    THEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1)
+    THEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
     echo "==> Carpeta del tema global detectada: ${THEME_SRC:-(ninguna)}"
 
     if [ -n "$THEME_SRC" ]; then
@@ -272,7 +272,7 @@ rm -rf "$THEME_BUILD_DIR"
 # 5.2 ICONOS YARU-GREY POR DEFECTO
 # ==========================================
 echo "==> Configurando iconos Yaru-Grey por defecto..."
-ICON_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d -iname "*yaru*grey*" 2>/dev/null | head -n1)
+ICON_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d -iname "*yaru*grey*" 2>/dev/null | head -n1 || true)
 echo "==> Carpeta de iconos detectada: ${ICON_DIR:-(ninguna)}"
 
 if [ -n "$ICON_DIR" ]; then
