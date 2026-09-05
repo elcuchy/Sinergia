@@ -174,250 +174,205 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme yamis-icon-theme-git fetch-git --noconfirm
-  
-  
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git --noconfirm
+
 # ==========================================
-# 5.1 INSTALACIÓN DEL TEMA MONOCHROME (GLOBAL + SPLASH + SDDM) Y ÁCONOS YARU-GREY
+# 5.1 TEMA GLOBAL BREEZE DARK POR DEFECTO
 # ==========================================
-echo "==> Asegurando wget para el instalador de Monochrome..."
-sudo pacman -S --needed wget --noconfirm
-
-echo "==> Instalando tema Monochrome (KDE)..."
-THEME_BUILD_DIR=$(mktemp -d)
-sudo chown -R "$REAL_USER:$REAL_USER" "$THEME_BUILD_DIR"
-
-if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/pwyde/monochrome-kde.git "$THEME_BUILD_DIR/monochrome-kde"; then
-
-    # El propio instalador del proyecto copia tema global, plasma theme, aurorae,
-    # color scheme, kvantum, konsole y yakuake a $HOME automáticamente
-    sudo -u "$REAL_USER" bash -c "cd '$THEME_BUILD_DIR/monochrome-kde' && bash install.sh --install" || \
-        echo "==> Aviso: install.sh de Monochrome devolvió un error, se intentará continuar igual."
-
-    # SDDM: el proyecto NO lo instala automáticamente, hay que copiarlo a mano con sudo
-    SDDM_SRC=$(find "$THEME_BUILD_DIR/monochrome-kde" -type d -ipath "*sddm/themes/monochrome" | head -n1)
-    if [ -n "$SDDM_SRC" ]; then
-        sudo mkdir -p /usr/share/sddm/themes
-        sudo rm -rf /usr/share/sddm/themes/monochrome
-        sudo cp -r "$SDDM_SRC" /usr/share/sddm/themes/monochrome
-        echo "==> Tema SDDM Monochrome copiado a /usr/share/sddm/themes/monochrome"
-
-        sudo mkdir -p /etc/sddm.conf.d
-        sudo bash -c "printf '[Theme]\nCurrent=monochrome\n' > /etc/sddm.conf.d/kde_theme.conf"
-        echo "==> SDDM configurado para usar el tema Monochrome como pantalla de inicio de sesión."
-    else
-        echo "==> Aviso: no se encontró la carpeta del tema SDDM dentro del repositorio, se omite ese paso."
-    fi
-
-    # NOTA: el paquete "Tema Global" de Monochrome NO se instala vía install.sh
-    # (solo está disponible como descarga interactiva en la KDE Store, sin URL fija
-    # para automatizar de forma confiable). En su lugar, armamos el mismo resultado
-    # visual aplicando manualmente cada pieza que el instalador SÍ deja en $HOME:
-    # Plasma Theme, decoración de ventanas (Aurorae) y esquema de color.
-
-    USER_UID=$(id -u "$REAL_USER")
-    RUNTIME_DIR="/run/user/$USER_UID"
-    if [ ! -d "$RUNTIME_DIR" ]; then
-        RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
-    fi
-
-    # --- Plasma Theme (desktoptheme) ---
-    PLASMATHEME_DIR=$(find "$USER_HOME/.local/share/plasma/desktoptheme" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
-    echo "==> Carpeta de Plasma Theme detectada: ${PLASMATHEME_DIR:-(ninguna)}"
-    if [ -n "$PLASMATHEME_DIR" ]; then
-        PLASMATHEME_ID=$(basename "$PLASMATHEME_DIR")
-        if command -v plasma-apply-desktoptheme &>/dev/null; then
-            sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-                plasma-apply-desktoptheme "$PLASMATHEME_ID" || \
-                echo "==> Aviso: plasma-apply-desktoptheme devolvió un error, se usará el respaldo directo."
-        fi
-        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-        PLASMARC="$USER_HOME/.config/plasmarc"
-        if [ -f "$PLASMARC" ] && grep -q "^\[Theme\]" "$PLASMARC"; then
-            if grep -q "^name=" "$PLASMARC"; then
-                sudo -u "$REAL_USER" sed -i "s|^name=.*|name=$PLASMATHEME_ID|" "$PLASMARC"
-            else
-                sudo -u "$REAL_USER" sed -i "/^\[Theme\]/a name=$PLASMATHEME_ID" "$PLASMARC"
-            fi
-        else
-            sudo -u "$REAL_USER" bash -c "printf '\n[Theme]\nname=%s\n' '$PLASMATHEME_ID' >> '$PLASMARC'"
-        fi
-        echo "==> Plasma Theme $PLASMATHEME_ID fijado por defecto."
-    else
-        echo "==> Aviso: no se encontró el Plasma Theme de Monochrome instalado."
-    fi
-
-    # --- Decoración de ventanas (Aurorae) ---
-    AURORAE_DIR=$(find "$USER_HOME/.local/share/aurorae/themes" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
-    echo "==> Carpeta de Aurorae detectada: ${AURORAE_DIR:-(ninguna)}"
-    if [ -n "$AURORAE_DIR" ]; then
-        AURORAE_ID=$(basename "$AURORAE_DIR")
-        KWINRC="$USER_HOME/.config/kwinrc"
-        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-        sudo -u "$REAL_USER" touch "$KWINRC"
-        if command -v kwriteconfig6 &>/dev/null; then
-            KWRITECFG=kwriteconfig6
-        else
-            KWRITECFG=kwriteconfig5
-        fi
-        if command -v "$KWRITECFG" &>/dev/null; then
-            sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "library" "org.kde.kwin.aurorae"
-            sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "theme" "__aurorae__svg__$AURORAE_ID"
-            echo "==> Decoración de ventanas Aurorae ($AURORAE_ID) fijada por defecto."
-        else
-            echo "==> Aviso: no se encontró kwriteconfig6/5, no se pudo fijar la decoración de ventanas."
-        fi
-    else
-        echo "==> Aviso: no se encontró el tema Aurorae de Monochrome instalado."
-    fi
-
-    # --- Esquema de color ---
-    COLORSCHEME_FILE=$(find "$USER_HOME/.local/share/color-schemes" -maxdepth 1 -type f -iname "*onochrome*.colors" 2>/dev/null | head -n1 || true)
-    echo "==> Archivo de Color Scheme detectado: ${COLORSCHEME_FILE:-(ninguno)}"
-    if [ -n "$COLORSCHEME_FILE" ]; then
-        COLORSCHEME_ID=$(basename "$COLORSCHEME_FILE" .colors)
-        if command -v plasma-apply-colorscheme &>/dev/null; then
-            sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-                plasma-apply-colorscheme "$COLORSCHEME_ID" || \
-                echo "==> Aviso: plasma-apply-colorscheme devolvió un error, se usará el respaldo directo."
-        fi
-        KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-        if [ -f "$KDEGLOBALS" ] && grep -q "^\[General\]" "$KDEGLOBALS"; then
-            if grep -q "^ColorScheme=" "$KDEGLOBALS"; then
-                sudo -u "$REAL_USER" sed -i "s|^ColorScheme=.*|ColorScheme=$COLORSCHEME_ID|" "$KDEGLOBALS"
-            else
-                sudo -u "$REAL_USER" sed -i "/^\[General\]/a ColorScheme=$COLORSCHEME_ID" "$KDEGLOBALS"
-            fi
-        else
-            sudo -u "$REAL_USER" bash -c "printf '\n[General]\nColorScheme=%s\n' '$COLORSCHEME_ID' >> '$KDEGLOBALS'"
-        fi
-        echo "==> Color Scheme $COLORSCHEME_ID fijado por defecto."
-    else
-        echo "==> Aviso: no se encontró el Color Scheme de Monochrome instalado."
-    fi
-else
-    echo "==> Aviso: no se pudo clonar el repositorio de Monochrome, se omite la instalación del tema."
+echo "==> Fijando Breeze Dark como Tema Global por defecto..."
+BREEZEDARK_ID="org.kde.breezedark.desktop"
+USER_UID=$(id -u "$REAL_USER")
+RUNTIME_DIR="/run/user/$USER_UID"
+if [ ! -d "$RUNTIME_DIR" ]; then
+    RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
 fi
 
-rm -rf "$THEME_BUILD_DIR"
-
-# ==========================================
-# 5.2 ICONOS YARU-GREY POR DEFECTO
-# ==========================================
-echo "==> Configurando iconos Yaru-Grey por defecto..."
-ICON_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d -iname "*yaru*grey*" 2>/dev/null | head -n1 || true)
-echo "==> Carpeta de iconos detectada: ${ICON_DIR:-(ninguna)}"
-
-if [ -n "$ICON_DIR" ]; then
-    ICON_THEME_ID=$(basename "$ICON_DIR")
-    KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-    if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
-        if grep -q "^Theme=" "$KDEGLOBALS"; then
-            sudo -u "$REAL_USER" sed -i "0,/^\[Icons\]/! {0,/^Theme=/ s|^Theme=.*|Theme=$ICON_THEME_ID|}" "$KDEGLOBALS"
-        else
-            sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$ICON_THEME_ID" "$KDEGLOBALS"
-        fi
-    else
-        sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$ICON_THEME_ID' >> '$KDEGLOBALS'"
-    fi
-    echo "==> Icon theme $ICON_THEME_ID fijado como icono por defecto."
-else
-    echo "==> Aviso: no se encontró ninguna variante Yaru-Grey instalada, se omite fijar el icon theme."
-fi
-
-# ==========================================
-# 5.3 KVANTUM COMO ESTILO DE APLICACIÓN + TEMA MONOCHROME
-# ==========================================
-echo "==> Configurando Kvantum con el tema Monochrome..."
-KVANTUM_THEME_DIR=$(find "$USER_HOME/.config/Kvantum" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
-echo "==> Carpeta de tema Kvantum detectada: ${KVANTUM_THEME_DIR:-(ninguna)}"
-
-if [ -n "$KVANTUM_THEME_DIR" ]; then
-    KVANTUM_THEME_ID=$(basename "$KVANTUM_THEME_DIR")
-    KVANTUM_CONFIG="$USER_HOME/.config/Kvantum/kvantum.kvconfig"
-    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config/Kvantum"
-    if [ -f "$KVANTUM_CONFIG" ] && grep -q "^\[General\]" "$KVANTUM_CONFIG"; then
-        if grep -q "^theme=" "$KVANTUM_CONFIG"; then
-            sudo -u "$REAL_USER" sed -i "s|^theme=.*|theme=$KVANTUM_THEME_ID|" "$KVANTUM_CONFIG"
-        else
-            sudo -u "$REAL_USER" sed -i "/^\[General\]/a theme=$KVANTUM_THEME_ID" "$KVANTUM_CONFIG"
-        fi
-    else
-        sudo -u "$REAL_USER" bash -c "printf '[General]\ntheme=%s\n' '$KVANTUM_THEME_ID' >> '$KVANTUM_CONFIG'"
-    fi
-    echo "==> Tema Kvantum $KVANTUM_THEME_ID fijado por defecto."
-else
-    echo "==> Aviso: no se encontró el tema Kvantum de Monochrome instalado."
-fi
-
-# Fijar Kvantum como estilo de aplicación (widget style) por defecto
-KDEGLOBALS="$USER_HOME/.config/kdeglobals"
 sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+if command -v plasma-apply-lookandfeel &>/dev/null; then
+    sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+        plasma-apply-lookandfeel -a "$BREEZEDARK_ID" || \
+        echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
+else
+    echo "==> Aviso: plasma-apply-lookandfeel no está disponible, se usará el respaldo directo sobre kdeglobals."
+fi
+
+KDEGLOBALS="$USER_HOME/.config/kdeglobals"
 if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
-    if grep -q "^widgetStyle=" "$KDEGLOBALS"; then
-        sudo -u "$REAL_USER" sed -i "s|^widgetStyle=.*|widgetStyle=kvantum|" "$KDEGLOBALS"
+    if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$BREEZEDARK_ID|" "$KDEGLOBALS"
     else
-        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a widgetStyle=kvantum" "$KDEGLOBALS"
+        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$BREEZEDARK_ID" "$KDEGLOBALS"
     fi
 else
-    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nwidgetStyle=kvantum\n' >> '$KDEGLOBALS'"
+    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$BREEZEDARK_ID' >> '$KDEGLOBALS'"
 fi
-echo "==> Kvantum fijado como estilo de aplicación por defecto."
+echo "==> Breeze Dark fijado como Tema Global por defecto."
 
 # ==========================================
-# 5.4 SKIN DE YAKUAKE MONOCHROME POR DEFECTO
+# 5.2 ICONOS YAMIS POR DEFECTO + ÍCONO DE LANZADOR ARCH LINUX EN BLANCO
 # ==========================================
-echo "==> Configurando skin de Yakuake Monochrome..."
-YAKUAKE_SKIN_DIR=$(find "$USER_HOME/.local/share/yakuake/skins" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
-echo "==> Carpeta de skin de Yakuake detectada: ${YAKUAKE_SKIN_DIR:-(ninguna)}"
-
-if [ -n "$YAKUAKE_SKIN_DIR" ]; then
-    YAKUAKE_SKIN_ID=$(basename "$YAKUAKE_SKIN_DIR")
-    YAKUAKERC="$USER_HOME/.config/yakuakerc"
-    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-    if [ -f "$YAKUAKERC" ] && grep -q "^\[Appearance\]" "$YAKUAKERC"; then
-        if grep -q "^Skin=" "$YAKUAKERC"; then
-            sudo -u "$REAL_USER" sed -i "s|^Skin=.*|Skin=$YAKUAKE_SKIN_ID|" "$YAKUAKERC"
-        else
-            sudo -u "$REAL_USER" sed -i "/^\[Appearance\]/a Skin=$YAKUAKE_SKIN_ID" "$YAKUAKERC"
-        fi
-    else
-        sudo -u "$REAL_USER" bash -c "printf '\n[Appearance]\nSkin=%s\n' '$YAKUAKE_SKIN_ID' >> '$YAKUAKERC'"
-    fi
-    echo "==> Skin de Yakuake $YAKUAKE_SKIN_ID fijado por defecto."
-else
-    echo "==> Aviso: no se encontró el skin de Yakuake de Monochrome instalado."
-fi
-
-# ==========================================
-# 5.5 SUSTITUIR ICONOS POR YAMIS (Yet Another Monochrome Icon Set)
-# ==========================================
-echo "==> Sustituyendo iconos por YAMIS (Yet Another Monochrome Icon Set)..."
+echo "==> Configurando iconos YAMIS por defecto..."
 YAMIS_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d \( -iname "*yamis*" -o -iname "*yet*monochrome*" -o -iname "*another-monochrome*" \) 2>/dev/null | head -n1 || true)
 echo "==> Carpeta de iconos YAMIS detectada: ${YAMIS_DIR:-(ninguna)}"
 
+ICON_THEME_ID="YAMIS"
 if [ -n "$YAMIS_DIR" ]; then
-    YAMIS_ID=$(basename "$YAMIS_DIR")
-    KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-    if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
-        if grep -q "^Theme=" "$KDEGLOBALS"; then
-            sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$YAMIS_ID|" "$KDEGLOBALS"
-        else
-            sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$YAMIS_ID" "$KDEGLOBALS"
-        fi
-    else
-        sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$YAMIS_ID' >> '$KDEGLOBALS'"
-    fi
-    echo "==> Icon theme $YAMIS_ID fijado por defecto, sustituyendo a Yaru-Grey."
+    ICON_THEME_ID=$(basename "$YAMIS_DIR")
 else
-    echo "==> Aviso: no se encontró el icon theme YAMIS instalado, se mantiene Yaru-Grey como icon theme por defecto."
+    echo "==> Aviso: no se encontró la carpeta de YAMIS instalada, se usará el nombre 'YAMIS' de todos modos por si el paquete la crea más tarde."
+fi
+
+# Armar un pequeño tema de iconos propio que hereda de YAMIS y solo reemplaza
+# el ícono del lanzador de aplicaciones (Kickoff) por el logo de Arch Linux en blanco
+echo "==> Descargando y recoloreando el logo de Arch Linux en blanco..."
+ARCH_ICON_TMP=$(sudo -u "$REAL_USER" mktemp -d)
+if sudo -u "$REAL_USER" wget -q -O "$ARCH_ICON_TMP/archlinux-icon.svg" "https://www.vectorlogo.zone/logos/archlinux/archlinux-icon.svg"; then
+    sudo -u "$REAL_USER" sed -i 's|<svg\([^>]*\)>|<svg\1><style>*{fill:#ffffff !important;stroke:none !important;}</style>|' "$ARCH_ICON_TMP/archlinux-icon.svg"
+
+    LAUNCHER_THEME_DIR="$USER_HOME/.local/share/icons/YAMIS-ArchLauncher"
+    sudo -u "$REAL_USER" mkdir -p "$LAUNCHER_THEME_DIR/scalable/apps" "$LAUNCHER_THEME_DIR/scalable/places"
+    for name in start-here-kde-plasma start-here-kde start-here; do
+        sudo -u "$REAL_USER" cp "$ARCH_ICON_TMP/archlinux-icon.svg" "$LAUNCHER_THEME_DIR/scalable/apps/$name.svg"
+        sudo -u "$REAL_USER" cp "$ARCH_ICON_TMP/archlinux-icon.svg" "$LAUNCHER_THEME_DIR/scalable/places/$name.svg"
+    done
+
+    sudo -u "$REAL_USER" bash -c "cat > '$LAUNCHER_THEME_DIR/index.theme'" << EOF
+[Icon Theme]
+Name=YAMIS with Arch Launcher
+Comment=YAMIS icon set with a white Arch Linux launcher icon
+Inherits=$ICON_THEME_ID,hicolor
+Directories=scalable/apps,scalable/places
+
+[scalable/apps]
+Size=64
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Applications
+
+[scalable/places]
+Size=64
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Places
+EOF
+    echo "==> Tema de iconos compuesto YAMIS-ArchLauncher creado (hereda de $ICON_THEME_ID)."
+    ICON_THEME_ID="YAMIS-ArchLauncher"
+else
+    echo "==> Aviso: no se pudo descargar el logo de Arch Linux, se usará YAMIS sin el ícono de lanzador personalizado."
+fi
+rm -rf "$ARCH_ICON_TMP"
+
+KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
+    if grep -q "^Theme=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$ICON_THEME_ID|" "$KDEGLOBALS"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$ICON_THEME_ID" "$KDEGLOBALS"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$ICON_THEME_ID' >> '$KDEGLOBALS'"
+fi
+echo "==> Icon theme $ICON_THEME_ID fijado por defecto."
+
+# ==========================================
+# 5.3 TRANSPARENCIA POR DEFECTO EN KONSOLE
+# ==========================================
+echo "==> Configurando transparencia por defecto en Konsole..."
+KONSOLE_DATA_DIR="$USER_HOME/.local/share/konsole"
+sudo -u "$REAL_USER" mkdir -p "$KONSOLE_DATA_DIR"
+
+BASE_COLORSCHEME="/usr/share/konsole/Breeze.colorscheme"
+TRANSPARENT_SCHEME="$KONSOLE_DATA_DIR/BreezeTransparent.colorscheme"
+if [ -f "$BASE_COLORSCHEME" ]; then
+    sudo -u "$REAL_USER" cp "$BASE_COLORSCHEME" "$TRANSPARENT_SCHEME"
+else
+    echo "==> Aviso: no se encontró el color scheme base de Breeze, se crea uno mínimo."
+    sudo -u "$REAL_USER" bash -c "printf '[Background]\nColor=35,38,41\n[Foreground]\nColor=252,252,252\n[General]\nDescription=BreezeTransparent\n' > '$TRANSPARENT_SCHEME'"
+fi
+if grep -q "^\[General\]" "$TRANSPARENT_SCHEME" && grep -q "^Opacity=" "$TRANSPARENT_SCHEME"; then
+    sudo -u "$REAL_USER" sed -i "s|^Opacity=.*|Opacity=0.85|" "$TRANSPARENT_SCHEME"
+elif grep -q "^\[General\]" "$TRANSPARENT_SCHEME"; then
+    sudo -u "$REAL_USER" sed -i "/^\[General\]/a Opacity=0.85" "$TRANSPARENT_SCHEME"
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[General]\nOpacity=0.85\n' >> '$TRANSPARENT_SCHEME'"
+fi
+
+TRANSPARENT_PROFILE="$KONSOLE_DATA_DIR/Transparent.profile"
+sudo -u "$REAL_USER" bash -c "printf '[Appearance]\nColorScheme=BreezeTransparent\n\n[General]\nName=Transparent\nParent=FALLBACK/\n' > '$TRANSPARENT_PROFILE'"
+
+KONSOLERC="$USER_HOME/.config/konsolerc"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+if [ -f "$KONSOLERC" ] && grep -q "^\[Desktop Entry\]" "$KONSOLERC"; then
+    if grep -q "^DefaultProfile=" "$KONSOLERC"; then
+        sudo -u "$REAL_USER" sed -i "s|^DefaultProfile=.*|DefaultProfile=Transparent.profile|" "$KONSOLERC"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[Desktop Entry\]/a DefaultProfile=Transparent.profile" "$KONSOLERC"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '[Desktop Entry]\nDefaultProfile=Transparent.profile\n' >> '$KONSOLERC'"
+fi
+echo "==> Konsole configurado con transparencia (Opacity=0.85) como perfil por defecto."
+
+# Habilitar el efecto de escritorio Blur, para que la transparencia se vea bien
+KWINRC="$USER_HOME/.config/kwinrc"
+sudo -u "$REAL_USER" touch "$KWINRC"
+if grep -q "^\[Plugins\]" "$KWINRC" 2>/dev/null; then
+    if grep -q "^blurEnabled=" "$KWINRC"; then
+        sudo -u "$REAL_USER" sed -i "s|^blurEnabled=.*|blurEnabled=true|" "$KWINRC"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[Plugins\]/a blurEnabled=true" "$KWINRC"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[Plugins]\nblurEnabled=true\n' >> '$KWINRC'"
 fi
 
 # ==========================================
-# 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
+# 5.4 FONDO DE PANTALLA POR DEFECTO
+# ==========================================
+echo "==> Configurando el fondo de pantalla por defecto..."
+WALLPAPER_PKG_DIR="/usr/share/wallpapers/CustomArchWallpaper"
+sudo mkdir -p "$WALLPAPER_PKG_DIR/contents/images"
+
+if sudo wget -q -O "$WALLPAPER_PKG_DIR/contents/images/1920x1080.jpg" \
+    "https://raw.githubusercontent.com/UncleSpellbinder/Arch-Linux-HD-Wallpaper/main/ARCH_2__1920x1080.jpg"; then
+
+    sudo bash -c "cat > '$WALLPAPER_PKG_DIR/metadata.desktop'" << 'EOF'
+[Desktop Entry]
+Name=Custom Arch Wallpaper
+Type=Service
+X-KDE-ServiceTypes=Plasma/Wallpaper
+X-KDE-PluginInfo-Name=customarchwallpaper
+EOF
+
+    LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
+    if [ -f "$LNF_DEFAULTS" ]; then
+        if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
+            if grep -q "^Image=" "$LNF_DEFAULTS"; then
+                sudo sed -i "s|^Image=.*|Image=CustomArchWallpaper|" "$LNF_DEFAULTS"
+            else
+                sudo sed -i "/^\[Wallpaper\]/a Image=CustomArchWallpaper" "$LNF_DEFAULTS"
+            fi
+        else
+            sudo bash -c "printf '\n[Wallpaper]\nImage=CustomArchWallpaper\n' >> '$LNF_DEFAULTS'"
+        fi
+        echo "==> Fondo de pantalla por defecto de Breeze Dark cambiado a CustomArchWallpaper."
+    else
+        echo "==> Aviso: no se encontró el archivo defaults de Breeze Dark, no se pudo fijar el wallpaper por defecto del tema."
+    fi
+
+    # Intento de aplicación en vivo (solo tiene efecto si hay una sesión de Plasma activa)
+    if command -v plasma-apply-wallpaperimage &>/dev/null; then
+        sudo -u "$REAL_USER" plasma-apply-wallpaperimage "$WALLPAPER_PKG_DIR/contents/images/1920x1080.jpg" || \
+            echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión."
+    fi
+else
+    echo "==> Aviso: no se pudo descargar el fondo de pantalla desde GitHub, se omite este paso."
+fi
+
+
 # ==========================================
 echo "==> Configurando sddm como display manager por defecto..."
 
@@ -469,9 +424,10 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: SDDM"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema Monochrome: Plasma Theme + Decoración de ventanas + Color Scheme + Kvantum + Yakuake
- Icon theme: YAMIS (Yet Another Monochrome Icon Set)
- Pantalla de inicio de sesión (SDDM): Monochrome"
+echo " Tema Global: Breeze Dark
+ Icon theme: YAMIS con ícono de lanzador Arch Linux en blanco
+ Konsole: transparencia por defecto (Opacity=0.85)
+ Fondo de pantalla: Arch HD Wallpaper (GitHub)"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
 S        I    NN  N  E      R   R  G   G    I    A   A
