@@ -363,69 +363,64 @@ else
 fi
 
 # ==========================================
-# 5.4 CLONAR WALLPAPERS Y ESTABLECER 18.png POR DEFECTO
+# 5.4 CONFIGURAR WALLPAPER POR DEFECTO EN PLASMA (Cold Ripple)
 # ==========================================
-echo "==> Clonando repositorios de wallpapers..."
+echo "==> Configurando wallpaper por defecto (Cold Ripple de Risto Saukonpää)..."
 
-for repo_url in \
-    "https://github.com/UncleSpellbinder/Arch-Linux-HD-Wallpaper.git" \
-    "https://github.com/f4dzN/archlinux-wallpapers.git"; do
+WALLPAPER_NAME="ColdRipple"
+WALLPAPER_FILE="/usr/share/wallpapers/ColdRipple/contents/images/1920x1080.png"
 
-    WALLPAPER_TMP=$(sudo -u "$REAL_USER" mktemp -d)
-    if sudo -u "$REAL_USER" git clone --depth 1 "$repo_url" "$WALLPAPER_TMP/repo"; then
-        while IFS= read -r -d '' imgfile; do
-            base="$(basename "$imgfile")"
-            name="${base%.*}"
-            pkgdir="/usr/share/wallpapers/$name"
-            if [ -d "$pkgdir" ]; then
-                continue
-            fi
-            
-            # Crear la estructura que exige KDE Plasma
-            sudo mkdir -p "$pkgdir/contents/images"
-            sudo cp "$imgfile" "$pkgdir/contents/images/$base"
-            
-            # Generar metadata.desktop compatible con Plasma 5 y 6
-            sudo bash -c "cat > '$pkgdir/metadata.desktop'" << EOF
-[Desktop Entry]
-Name=$name
-Type=Service
-X-KDE-ServiceTypes=Plasma/Wallpaper
-X-KDE-PluginInfo-Name=$name
-EOF
-            sudo chmod -R 755 "$pkgdir"
-        done < <(find "$WALLPAPER_TMP/repo" -maxdepth 3 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print0)
+# 1. Asegurar que el fondo por defecto esté fijado en los 'defaults' de Breeze Dark
+LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
+if [ -f "$LNF_DEFAULTS" ]; then
+    sudo sed -i '/^Image=/d' "$LNF_DEFAULTS" 2>/dev/null || true
+    if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
+        sudo sed -i "/^\[Wallpaper\]/a Image=$WALLPAPER_NAME" "$LNF_DEFAULTS"
+    else
+        sudo bash -c "printf '\n[Wallpaper]\nImage=%s\n' '$WALLPAPER_NAME' >> '$LNF_DEFAULTS'"
     fi
-    rm -rf "$WALLPAPER_TMP"
-done
-
-TARGET_WALLPAPER="/usr/share/wallpapers/18/contents/images/18.png"
-
-# Verificar que la imagen exista y darle permisos de lectura globales
-if [ -f "$TARGET_WALLPAPER" ]; then
-    sudo chmod 644 "$TARGET_WALLPAPER"
-    echo "==> Aplicando fondo /usr/share/wallpapers/18/contents/images/18.png..."
-
-    # 1. Aplicar en la sesión de usuario activa (si existe gráfica)
-    USER_UID=$(id -u "$REAL_USER")
-    RUNTIME_DIR="/run/user/$USER_UID"
-    
-    if [ -d "$RUNTIME_DIR" ] && command -v plasma-apply-wallpaperimage &>/dev/null; then
-        sudo -u "$REAL_USER" XDG_RUNTIME_DIR="$RUNTIME_DIR" DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
-            plasma-apply-wallpaperimage "$TARGET_WALLPAPER" 2>/dev/null || true
-    fi
-
-    # 2. Configurar el archivo de inicio por defecto para nuevos inicios de sesión
-    PLASMRC_USER="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
-    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-
-    # Si ya existen configuraciones del escritorio, inyectar la ruta directa
-    if [ -f "$PLASMRC_USER" ]; then
-        sudo -u "$REAL_USER" sed -i 's|^Image=.*|Image=file://'"$TARGET_WALLPAPER"'|g' "$PLASMRC_USER"
-    fi
-else
-    echo "==> Error: No se encontró la imagen $TARGET_WALLPAPER"
 fi
+
+# 2. Configurar la estructura en plasma-org.kde.plasma.desktop-appletsrc para el usuario
+PLASMRC="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+
+if [ ! -f "$PLASMRC" ] || ! grep -q "\[Containments\]" "$PLASMRC"; then
+    # Generar la estructura base limpia que requiere Plasma para el fondo
+    sudo -u "$REAL_USER" bash -c "cat > '$PLASMRC'" << EOF
+[Containments][1]
+activityId=
+wallpaperplugin=org.kde.image
+
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
+ImageName=$WALLPAPER_NAME
+EOF
+else
+    # Si el archivo ya existe, actualizar o inyectar las líneas de imagen
+    if grep -q "\[Wallpaper\]\[org.kde.image\]\[General\]" "$PLASMRC"; then
+        sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=file:///usr/share/wallpapers/$WALLPAPER_NAME|" "$PLASMRC"
+        sudo -u "$REAL_USER" sed -i "s|^ImageName=.*|ImageName=$WALLPAPER_NAME|" "$PLASMRC"
+    else
+        sudo -u "$REAL_USER" bash -c "cat >> '$PLASMRC'" << EOF
+
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
+ImageName=$WALLPAPER_NAME
+EOF
+    fi
+fi
+
+# 3. Forzar el refresco dinámico si hay una sesión activa de Plasma
+USER_UID=$(id -u "$REAL_USER")
+RUNTIME_DIR="/run/user/$USER_UID"
+if [ -d "$RUNTIME_DIR" ] && command -v plasma-apply-wallpaperimage &>/dev/null; then
+    sudo -u "$REAL_USER" XDG_RUNTIME_DIR="$RUNTIME_DIR" DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+        plasma-apply-wallpaperimage "$WALLPAPER_FILE" 2>/dev/null || true
+fi
+
+echo "==> Fondo 'Cold Ripple' de Risto Saukonpää configurado por defecto."
+
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
