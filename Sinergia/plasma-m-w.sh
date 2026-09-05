@@ -224,7 +224,14 @@ fi
 
 # Buscar el archivo archlinux-logo que ya está presente en el sistema
 echo "==> Buscando el archivo archlinux-logo ya presente en el sistema..."
-ARCH_LOGO_FILE=$(find /usr/share "$USER_HOME" -iname "archlinux-logo*" -type f \( -iname "*.svg" -o -iname "*.png" -o -iname "*.svgz" \) 2>/dev/null | head -n1 || true)
+ARCH_LOGO_FILE="/usr/share/icons/yet-another-monochrome-icon-set/apps/scalable/archlinux.svg"
+if [ ! -f "$ARCH_LOGO_FILE" ]; then
+    echo "==> Aviso: no se encontró el archlinux.svg de YAMIS en la ruta esperada, se amplía la búsqueda..."
+    ARCH_LOGO_FILE=$(find /usr/share "$USER_HOME" -iname "archlinux-logo*" -type f \( -iname "*.svg" -o -iname "*.png" -o -iname "*.svgz" \) 2>/dev/null | head -n1 || true)
+    if [ -z "$ARCH_LOGO_FILE" ]; then
+        ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -iname "archlinux.svg" -type f 2>/dev/null | head -n1 || true)
+    fi
+fi
 echo "==> Archivo archlinux-logo detectado: ${ARCH_LOGO_FILE:-(ninguno)}"
 
 if [ -n "$ARCH_LOGO_FILE" ]; then
@@ -415,7 +422,9 @@ if [ -n "$DEFAULT_WALLPAPER_ID" ]; then
 
     # Intento de aplicación en vivo (solo tiene efecto si hay una sesión de Plasma activa)
     if command -v plasma-apply-wallpaperimage &>/dev/null; then
-        sudo -u "$REAL_USER" plasma-apply-wallpaperimage "/usr/share/wallpapers/$DEFAULT_WALLPAPER_ID/contents/images/18.png" || \
+        DEFAULT_WALLPAPER_PATH="/usr/share/wallpapers/$DEFAULT_WALLPAPER_ID/contents/18.png"
+        [ -f "$DEFAULT_WALLPAPER_PATH" ] || DEFAULT_WALLPAPER_PATH="/usr/share/wallpapers/$DEFAULT_WALLPAPER_ID/contents/images/18.png"
+        sudo -u "$REAL_USER" plasma-apply-wallpaperimage "$DEFAULT_WALLPAPER_PATH" || \
             echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión."
     fi
 else
