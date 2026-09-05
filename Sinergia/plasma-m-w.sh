@@ -365,15 +365,13 @@ fi
 # ==========================================
 # 5.4 CLONAR WALLPAPERS Y ESTABLECER 18.png POR DEFECTO
 # ==========================================
-echo "==> Clonando los repositorios de wallpapers..."
+echo "==> Clonando repositorios de wallpapers..."
 
-# 1. Clonar repositorios de wallpapers
 for repo_url in \
     "https://github.com/UncleSpellbinder/Arch-Linux-HD-Wallpaper.git" \
     "https://github.com/f4dzN/archlinux-wallpapers.git"; do
 
     WALLPAPER_TMP=$(sudo -u "$REAL_USER" mktemp -d)
-    echo "==> Clonando $repo_url ..."
     if sudo -u "$REAL_USER" git clone --depth 1 "$repo_url" "$WALLPAPER_TMP/repo"; then
         while IFS= read -r -d '' imgfile; do
             base="$(basename "$imgfile")"
@@ -382,8 +380,12 @@ for repo_url in \
             if [ -d "$pkgdir" ]; then
                 continue
             fi
+            
+            # Crear la estructura que exige KDE Plasma
             sudo mkdir -p "$pkgdir/contents/images"
             sudo cp "$imgfile" "$pkgdir/contents/images/$base"
+            
+            # Generar metadata.desktop compatible con Plasma 5 y 6
             sudo bash -c "cat > '$pkgdir/metadata.desktop'" << EOF
 [Desktop Entry]
 Name=$name
@@ -391,57 +393,39 @@ Type=Service
 X-KDE-ServiceTypes=Plasma/Wallpaper
 X-KDE-PluginInfo-Name=$name
 EOF
+            sudo chmod -R 755 "$pkgdir"
         done < <(find "$WALLPAPER_TMP/repo" -maxdepth 3 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print0)
     fi
     rm -rf "$WALLPAPER_TMP"
 done
 
-# Definir la ruta absoluta deseada
 TARGET_WALLPAPER="/usr/share/wallpapers/18/contents/images/18.png"
 
-# Verificación de existencia del archivo objetivo
-if [ ! -f "$TARGET_WALLPAPER" ]; then
-    echo "==> Aviso: $TARGET_WALLPAPER no existe aún. Creando la estructura por si no se clonó..."
-    sudo mkdir -p /usr/share/wallpapers/18/contents/images
-fi
+# Verificar que la imagen exista y darle permisos de lectura globales
+if [ -f "$TARGET_WALLPAPER" ]; then
+    sudo chmod 644 "$TARGET_WALLPAPER"
+    echo "==> Aplicando fondo /usr/share/wallpapers/18/contents/images/18.png..."
 
-echo "==> Estableciendo /usr/share/wallpapers/18/contents/images/18.png por defecto..."
-
-# 2. Configurardefaults de Look and Feel en Plasma para sesiones nuevas
-LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
-if [ -f "$LNF_DEFAULTS" ]; then
-    if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
-        if grep -q "^Image=" "$LNF_DEFAULTS"; then
-            sudo sed -i "s|^Image=.*|Image=18|" "$LNF_DEFAULTS"
-        else
-            sudo sed -i "/^\[Wallpaper\]/a Image=18" "$LNF_DEFAULTS"
-        fi
-    else
-        sudo bash -c "printf '\n[Wallpaper]\nImage=18\n' >> '$LNF_DEFAULTS'"
+    # 1. Aplicar en la sesión de usuario activa (si existe gráfica)
+    USER_UID=$(id -u "$REAL_USER")
+    RUNTIME_DIR="/run/user/$USER_UID"
+    
+    if [ -d "$RUNTIME_DIR" ] && command -v plasma-apply-wallpaperimage &>/dev/null; then
+        sudo -u "$REAL_USER" XDG_RUNTIME_DIR="$RUNTIME_DIR" DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+            plasma-apply-wallpaperimage "$TARGET_WALLPAPER" 2>/dev/null || true
     fi
+
+    # 2. Configurar el archivo de inicio por defecto para nuevos inicios de sesión
+    PLASMRC_USER="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+
+    # Si ya existen configuraciones del escritorio, inyectar la ruta directa
+    if [ -f "$PLASMRC_USER" ]; then
+        sudo -u "$REAL_USER" sed -i 's|^Image=.*|Image=file://'"$TARGET_WALLPAPER"'|g' "$PLASMRC_USER"
+    fi
+else
+    echo "==> Error: No se encontró la imagen $TARGET_WALLPAPER"
 fi
-
-# 3. Forzar la ruta directamente en la plantilla layout.js de Plasma (Primer inicio de sesión)
-LAYOUT_JS="/usr/share/plasma/shells/org.kde.plasma.desktop/contents/layout.js"
-if [ -f "$LAYOUT_JS" ]; then
-    sudo awk -v bgpath="$TARGET_WALLPAPER" '
-        {
-            print
-            if ($0 ~ /var desktop =/ || $0 ~ /let desktop =/ || $0 ~ /const desktop =/) {
-                print "desktop.currentConfigGroup = [\"Wallpaper\", \"org.kde.image\", \"General\"];"
-                print "desktop.writeConfig(\"Image\", \"" bgpath "\");"
-            }
-        }
-    ' "$LAYOUT_JS" | sudo tee "$LAYOUT_JS.tmp" > /dev/null && sudo mv "$LAYOUT_JS.tmp" "$LAYOUT_JS"
-fi
-
-# 4. Intentar aplicar en la sesión activa si se ejecuta con interfaz gráfica
-if command -v plasma-apply-wallpaperimage &>/dev/null; then
-    sudo -u "$REAL_USER" plasma-apply-wallpaperimage "$TARGET_WALLPAPER" 2>/dev/null || true
-fi
-
-echo "==> Fondo /usr/share/wallpapers/18/contents/images/18.png fijado exitosamente."
-
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
