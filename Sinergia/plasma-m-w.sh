@@ -363,11 +363,11 @@ else
 fi
 
 # ==========================================
-# 5.4 CLONAR TODOS LOS WALLPAPERS DE AMBOS REPOS Y FIJAR 18.png POR DEFECTO
+# 5.4 CLONAR WALLPAPERS Y ESTABLECER 18.png POR DEFECTO
 # ==========================================
 echo "==> Clonando los repositorios de wallpapers..."
-DEFAULT_WALLPAPER_ID=""
 
+# 1. Clonar repositorios de wallpapers
 for repo_url in \
     "https://github.com/UncleSpellbinder/Arch-Linux-HD-Wallpaper.git" \
     "https://github.com/f4dzN/archlinux-wallpapers.git"; do
@@ -380,7 +380,6 @@ for repo_url in \
             name="${base%.*}"
             pkgdir="/usr/share/wallpapers/$name"
             if [ -d "$pkgdir" ]; then
-                echo "==> Aviso: ya existe un wallpaper llamado '$name' (de otro repo), se omite para no sobrescribirlo."
                 continue
             fi
             sudo mkdir -p "$pkgdir/contents/images"
@@ -392,44 +391,56 @@ Type=Service
 X-KDE-ServiceTypes=Plasma/Wallpaper
 X-KDE-PluginInfo-Name=$name
 EOF
-            echo "==> Wallpaper instalado: $pkgdir"
-            if [ "$base" = "18.png" ] || [ "$name" = "18" ]; then
-                DEFAULT_WALLPAPER_ID="$name"
-            fi
         done < <(find "$WALLPAPER_TMP/repo" -maxdepth 3 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print0)
-    else
-        echo "==> Aviso: no se pudo clonar $repo_url, se omite este repositorio."
     fi
     rm -rf "$WALLPAPER_TMP"
 done
 
-if [ -n "$DEFAULT_WALLPAPER_ID" ]; then
-    LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
-    if [ -f "$LNF_DEFAULTS" ]; then
-        if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
-            if grep -q "^Image=" "$LNF_DEFAULTS"; then
-                sudo sed -i "s|^Image=.*|Image=$DEFAULT_WALLPAPER_ID|" "$LNF_DEFAULTS"
-            else
-                sudo sed -i "/^\[Wallpaper\]/a Image=$DEFAULT_WALLPAPER_ID" "$LNF_DEFAULTS"
-            fi
-        else
-            sudo bash -c "printf '\n[Wallpaper]\nImage=%s\n' '$DEFAULT_WALLPAPER_ID' >> '$LNF_DEFAULTS'"
-        fi
-        echo "==> Fondo de pantalla por defecto de Breeze Dark cambiado a $DEFAULT_WALLPAPER_ID."
-    else
-        echo "==> Aviso: no se encontró el archivo defaults de Breeze Dark, no se pudo fijar el wallpaper por defecto del tema."
-    fi
+# Definir la ruta absoluta deseada
+TARGET_WALLPAPER="/usr/share/wallpapers/18/contents/images/18.png"
 
-    # Intento de aplicación en vivo (solo tiene efecto si hay una sesión de Plasma activa)
-    if command -v plasma-apply-wallpaperimage &>/dev/null; then
-        DEFAULT_WALLPAPER_PATH="/usr/share/wallpapers/$DEFAULT_WALLPAPER_ID/contents/18.png"
-        [ -f "$DEFAULT_WALLPAPER_PATH" ] || DEFAULT_WALLPAPER_PATH="/usr/share/wallpapers/$DEFAULT_WALLPAPER_ID/contents/images/18.png"
-        sudo -u "$REAL_USER" plasma-apply-wallpaperimage "$DEFAULT_WALLPAPER_PATH" || \
-            echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión."
-    fi
-else
-    echo "==> Aviso: no se encontró 18.png entre los wallpapers clonados, no se cambió el wallpaper por defecto."
+# Verificación de existencia del archivo objetivo
+if [ ! -f "$TARGET_WALLPAPER" ]; then
+    echo "==> Aviso: $TARGET_WALLPAPER no existe aún. Creando la estructura por si no se clonó..."
+    sudo mkdir -p /usr/share/wallpapers/18/contents/images
 fi
+
+echo "==> Estableciendo /usr/share/wallpapers/18/contents/images/18.png por defecto..."
+
+# 2. Configurardefaults de Look and Feel en Plasma para sesiones nuevas
+LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
+if [ -f "$LNF_DEFAULTS" ]; then
+    if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
+        if grep -q "^Image=" "$LNF_DEFAULTS"; then
+            sudo sed -i "s|^Image=.*|Image=18|" "$LNF_DEFAULTS"
+        else
+            sudo sed -i "/^\[Wallpaper\]/a Image=18" "$LNF_DEFAULTS"
+        fi
+    else
+        sudo bash -c "printf '\n[Wallpaper]\nImage=18\n' >> '$LNF_DEFAULTS'"
+    fi
+fi
+
+# 3. Forzar la ruta directamente en la plantilla layout.js de Plasma (Primer inicio de sesión)
+LAYOUT_JS="/usr/share/plasma/shells/org.kde.plasma.desktop/contents/layout.js"
+if [ -f "$LAYOUT_JS" ]; then
+    sudo awk -v bgpath="$TARGET_WALLPAPER" '
+        {
+            print
+            if ($0 ~ /var desktop =/ || $0 ~ /let desktop =/ || $0 ~ /const desktop =/) {
+                print "desktop.currentConfigGroup = [\"Wallpaper\", \"org.kde.image\", \"General\"];"
+                print "desktop.writeConfig(\"Image\", \"" bgpath "\");"
+            }
+        }
+    ' "$LAYOUT_JS" | sudo tee "$LAYOUT_JS.tmp" > /dev/null && sudo mv "$LAYOUT_JS.tmp" "$LAYOUT_JS"
+fi
+
+# 4. Intentar aplicar en la sesión activa si se ejecuta con interfaz gráfica
+if command -v plasma-apply-wallpaperimage &>/dev/null; then
+    sudo -u "$REAL_USER" plasma-apply-wallpaperimage "$TARGET_WALLPAPER" 2>/dev/null || true
+fi
+
+echo "==> Fondo /usr/share/wallpapers/18/contents/images/18.png fijado exitosamente."
 
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
