@@ -126,6 +126,9 @@ sudo pacman -S --noconfirm --needed \
   powerdevil \
   plasma-systemmonitor \
   kwalletmanager \
+  yakuake \
+  kvantum \
+  kvantum-qt5 \
   qbittorrent \
   obs-studio \
   audacity \
@@ -171,7 +174,7 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme yamis-icon-theme-git fetch-git --noconfirm
   
   
 # ==========================================
@@ -206,61 +209,92 @@ if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/pwyde/monochrome-
         echo "==> Aviso: no se encontró la carpeta del tema SDDM dentro del repositorio, se omite ese paso."
     fi
 
-    # Detectar el Tema Global instalado para aplicarlo/fijarlo por defecto
-    LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-    THEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
-    echo "==> Carpeta del tema global detectada: ${THEME_SRC:-(ninguna)}"
+    # NOTA: el paquete "Tema Global" de Monochrome NO se instala vía install.sh
+    # (solo está disponible como descarga interactiva en la KDE Store, sin URL fija
+    # para automatizar de forma confiable). En su lugar, armamos el mismo resultado
+    # visual aplicando manualmente cada pieza que el instalador SÍ deja en $HOME:
+    # Plasma Theme, decoración de ventanas (Aurorae) y esquema de color.
 
-    if [ -n "$THEME_SRC" ]; then
-        METADATA_FILE="$THEME_SRC/metadata.desktop"
-        [ -f "$METADATA_FILE" ] || METADATA_FILE="$THEME_SRC/metadata.json"
+    USER_UID=$(id -u "$REAL_USER")
+    RUNTIME_DIR="/run/user/$USER_UID"
+    if [ ! -d "$RUNTIME_DIR" ]; then
+        RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
+    fi
 
-        THEME_ID=$(grep -m1 -E "\"?X-KDE-PluginInfo-Name\"?[=:]" "$METADATA_FILE" 2>/dev/null | sed -E 's/.*[=:]\s*"?([^",]+)"?.*/\1/' || true)
-        THEME_ID=$(echo "$THEME_ID" | tr -d '[:space:]')
-        THEME_ID=${THEME_ID:-$(basename "$THEME_SRC")}
-        echo "==> ID del tema global a aplicar: $THEME_ID"
-
-        # Aplicar en vivo si hay herramienta disponible (modo offscreen, sin requerir sesión gráfica)
-        if command -v plasma-apply-lookandfeel &>/dev/null; then
-            USER_UID=$(id -u "$REAL_USER")
-            RUNTIME_DIR="/run/user/$USER_UID"
-            if [ ! -d "$RUNTIME_DIR" ]; then
-                RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
-            fi
+    # --- Plasma Theme (desktoptheme) ---
+    PLASMATHEME_DIR=$(find "$USER_HOME/.local/share/plasma/desktoptheme" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
+    echo "==> Carpeta de Plasma Theme detectada: ${PLASMATHEME_DIR:-(ninguna)}"
+    if [ -n "$PLASMATHEME_DIR" ]; then
+        PLASMATHEME_ID=$(basename "$PLASMATHEME_DIR")
+        if command -v plasma-apply-desktoptheme &>/dev/null; then
             sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-                plasma-apply-lookandfeel -a "$THEME_ID" || \
-                echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
-        else
-            echo "==> Aviso: plasma-apply-lookandfeel no está disponible, se usará el respaldo directo sobre kdeglobals."
+                plasma-apply-desktoptheme "$PLASMATHEME_ID" || \
+                echo "==> Aviso: plasma-apply-desktoptheme devolvió un error, se usará el respaldo directo."
         fi
+        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+        PLASMARC="$USER_HOME/.config/plasmarc"
+        if [ -f "$PLASMARC" ] && grep -q "^\[Theme\]" "$PLASMARC"; then
+            if grep -q "^name=" "$PLASMARC"; then
+                sudo -u "$REAL_USER" sed -i "s|^name=.*|name=$PLASMATHEME_ID|" "$PLASMARC"
+            else
+                sudo -u "$REAL_USER" sed -i "/^\[Theme\]/a name=$PLASMATHEME_ID" "$PLASMARC"
+            fi
+        else
+            sudo -u "$REAL_USER" bash -c "printf '\n[Theme]\nname=%s\n' '$PLASMATHEME_ID' >> '$PLASMARC'"
+        fi
+        echo "==> Plasma Theme $PLASMATHEME_ID fijado por defecto."
+    else
+        echo "==> Aviso: no se encontró el Plasma Theme de Monochrome instalado."
+    fi
 
-        # Respaldo: forzar el tema global y el splash directamente en los archivos de config,
-        # por si el paso anterior no tuvo efecto por falta de sesión gráfica activa
+    # --- Decoración de ventanas (Aurorae) ---
+    AURORAE_DIR=$(find "$USER_HOME/.local/share/aurorae/themes" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
+    echo "==> Carpeta de Aurorae detectada: ${AURORAE_DIR:-(ninguna)}"
+    if [ -n "$AURORAE_DIR" ]; then
+        AURORAE_ID=$(basename "$AURORAE_DIR")
+        KWINRC="$USER_HOME/.config/kwinrc"
+        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+        sudo -u "$REAL_USER" touch "$KWINRC"
+        if command -v kwriteconfig6 &>/dev/null; then
+            KWRITECFG=kwriteconfig6
+        else
+            KWRITECFG=kwriteconfig5
+        fi
+        if command -v "$KWRITECFG" &>/dev/null; then
+            sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "library" "org.kde.kwin.aurorae"
+            sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "theme" "__aurorae__svg__$AURORAE_ID"
+            echo "==> Decoración de ventanas Aurorae ($AURORAE_ID) fijada por defecto."
+        else
+            echo "==> Aviso: no se encontró kwriteconfig6/5, no se pudo fijar la decoración de ventanas."
+        fi
+    else
+        echo "==> Aviso: no se encontró el tema Aurorae de Monochrome instalado."
+    fi
+
+    # --- Esquema de color ---
+    COLORSCHEME_FILE=$(find "$USER_HOME/.local/share/color-schemes" -maxdepth 1 -type f -iname "*onochrome*.colors" 2>/dev/null | head -n1 || true)
+    echo "==> Archivo de Color Scheme detectado: ${COLORSCHEME_FILE:-(ninguno)}"
+    if [ -n "$COLORSCHEME_FILE" ]; then
+        COLORSCHEME_ID=$(basename "$COLORSCHEME_FILE" .colors)
+        if command -v plasma-apply-colorscheme &>/dev/null; then
+            sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+                plasma-apply-colorscheme "$COLORSCHEME_ID" || \
+                echo "==> Aviso: plasma-apply-colorscheme devolvió un error, se usará el respaldo directo."
+        fi
         KDEGLOBALS="$USER_HOME/.config/kdeglobals"
         sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-        if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
-            if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
-                sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$THEME_ID|" "$KDEGLOBALS"
+        if [ -f "$KDEGLOBALS" ] && grep -q "^\[General\]" "$KDEGLOBALS"; then
+            if grep -q "^ColorScheme=" "$KDEGLOBALS"; then
+                sudo -u "$REAL_USER" sed -i "s|^ColorScheme=.*|ColorScheme=$COLORSCHEME_ID|" "$KDEGLOBALS"
             else
-                sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$THEME_ID" "$KDEGLOBALS"
+                sudo -u "$REAL_USER" sed -i "/^\[General\]/a ColorScheme=$COLORSCHEME_ID" "$KDEGLOBALS"
             fi
         else
-            sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$THEME_ID' >> '$KDEGLOBALS'"
+            sudo -u "$REAL_USER" bash -c "printf '\n[General]\nColorScheme=%s\n' '$COLORSCHEME_ID' >> '$KDEGLOBALS'"
         fi
-
-        KSPLASHRC="$USER_HOME/.config/ksplashrc"
-        if [ -f "$KSPLASHRC" ] && grep -q "^\[KSplash\]" "$KSPLASHRC"; then
-            if grep -q "^Theme=" "$KSPLASHRC"; then
-                sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$THEME_ID|" "$KSPLASHRC"
-            else
-                sudo -u "$REAL_USER" sed -i "/^\[KSplash\]/a Theme=$THEME_ID" "$KSPLASHRC"
-            fi
-        else
-            sudo -u "$REAL_USER" bash -c "printf '\n[KSplash]\nTheme=%s\n' '$THEME_ID' >> '$KSPLASHRC'"
-        fi
-        echo "==> Tema $THEME_ID fijado como Global Theme y Splash Screen por defecto."
+        echo "==> Color Scheme $COLORSCHEME_ID fijado por defecto."
     else
-        echo "==> Aviso: no se encontró el Tema Global de Monochrome instalado, se omite fijarlo por defecto."
+        echo "==> Aviso: no se encontró el Color Scheme de Monochrome instalado."
     fi
 else
     echo "==> Aviso: no se pudo clonar el repositorio de Monochrome, se omite la instalación del tema."
@@ -291,6 +325,95 @@ if [ -n "$ICON_DIR" ]; then
     echo "==> Icon theme $ICON_THEME_ID fijado como icono por defecto."
 else
     echo "==> Aviso: no se encontró ninguna variante Yaru-Grey instalada, se omite fijar el icon theme."
+fi
+
+# ==========================================
+# 5.3 KVANTUM COMO ESTILO DE APLICACIÓN + TEMA MONOCHROME
+# ==========================================
+echo "==> Configurando Kvantum con el tema Monochrome..."
+KVANTUM_THEME_DIR=$(find "$USER_HOME/.config/Kvantum" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
+echo "==> Carpeta de tema Kvantum detectada: ${KVANTUM_THEME_DIR:-(ninguna)}"
+
+if [ -n "$KVANTUM_THEME_DIR" ]; then
+    KVANTUM_THEME_ID=$(basename "$KVANTUM_THEME_DIR")
+    KVANTUM_CONFIG="$USER_HOME/.config/Kvantum/kvantum.kvconfig"
+    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config/Kvantum"
+    if [ -f "$KVANTUM_CONFIG" ] && grep -q "^\[General\]" "$KVANTUM_CONFIG"; then
+        if grep -q "^theme=" "$KVANTUM_CONFIG"; then
+            sudo -u "$REAL_USER" sed -i "s|^theme=.*|theme=$KVANTUM_THEME_ID|" "$KVANTUM_CONFIG"
+        else
+            sudo -u "$REAL_USER" sed -i "/^\[General\]/a theme=$KVANTUM_THEME_ID" "$KVANTUM_CONFIG"
+        fi
+    else
+        sudo -u "$REAL_USER" bash -c "printf '[General]\ntheme=%s\n' '$KVANTUM_THEME_ID' >> '$KVANTUM_CONFIG'"
+    fi
+    echo "==> Tema Kvantum $KVANTUM_THEME_ID fijado por defecto."
+else
+    echo "==> Aviso: no se encontró el tema Kvantum de Monochrome instalado."
+fi
+
+# Fijar Kvantum como estilo de aplicación (widget style) por defecto
+KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
+    if grep -q "^widgetStyle=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^widgetStyle=.*|widgetStyle=kvantum|" "$KDEGLOBALS"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a widgetStyle=kvantum" "$KDEGLOBALS"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nwidgetStyle=kvantum\n' >> '$KDEGLOBALS'"
+fi
+echo "==> Kvantum fijado como estilo de aplicación por defecto."
+
+# ==========================================
+# 5.4 SKIN DE YAKUAKE MONOCHROME POR DEFECTO
+# ==========================================
+echo "==> Configurando skin de Yakuake Monochrome..."
+YAKUAKE_SKIN_DIR=$(find "$USER_HOME/.local/share/yakuake/skins" -maxdepth 1 -type d -iname "*onochrome*" 2>/dev/null | head -n1 || true)
+echo "==> Carpeta de skin de Yakuake detectada: ${YAKUAKE_SKIN_DIR:-(ninguna)}"
+
+if [ -n "$YAKUAKE_SKIN_DIR" ]; then
+    YAKUAKE_SKIN_ID=$(basename "$YAKUAKE_SKIN_DIR")
+    YAKUAKERC="$USER_HOME/.config/yakuakerc"
+    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+    if [ -f "$YAKUAKERC" ] && grep -q "^\[Appearance\]" "$YAKUAKERC"; then
+        if grep -q "^Skin=" "$YAKUAKERC"; then
+            sudo -u "$REAL_USER" sed -i "s|^Skin=.*|Skin=$YAKUAKE_SKIN_ID|" "$YAKUAKERC"
+        else
+            sudo -u "$REAL_USER" sed -i "/^\[Appearance\]/a Skin=$YAKUAKE_SKIN_ID" "$YAKUAKERC"
+        fi
+    else
+        sudo -u "$REAL_USER" bash -c "printf '\n[Appearance]\nSkin=%s\n' '$YAKUAKE_SKIN_ID' >> '$YAKUAKERC'"
+    fi
+    echo "==> Skin de Yakuake $YAKUAKE_SKIN_ID fijado por defecto."
+else
+    echo "==> Aviso: no se encontró el skin de Yakuake de Monochrome instalado."
+fi
+
+# ==========================================
+# 5.5 SUSTITUIR ICONOS POR YAMIS (Yet Another Monochrome Icon Set)
+# ==========================================
+echo "==> Sustituyendo iconos por YAMIS (Yet Another Monochrome Icon Set)..."
+YAMIS_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d \( -iname "*yamis*" -o -iname "*yet*monochrome*" -o -iname "*another-monochrome*" \) 2>/dev/null | head -n1 || true)
+echo "==> Carpeta de iconos YAMIS detectada: ${YAMIS_DIR:-(ninguna)}"
+
+if [ -n "$YAMIS_DIR" ]; then
+    YAMIS_ID=$(basename "$YAMIS_DIR")
+    KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+    if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
+        if grep -q "^Theme=" "$KDEGLOBALS"; then
+            sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$YAMIS_ID|" "$KDEGLOBALS"
+        else
+            sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$YAMIS_ID" "$KDEGLOBALS"
+        fi
+    else
+        sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$YAMIS_ID' >> '$KDEGLOBALS'"
+    fi
+    echo "==> Icon theme $YAMIS_ID fijado por defecto, sustituyendo a Yaru-Grey."
+else
+    echo "==> Aviso: no se encontró el icon theme YAMIS instalado, se mantiene Yaru-Grey como icon theme por defecto."
 fi
 
 # ==========================================
@@ -346,9 +469,8 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: SDDM"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema global: Monochrome
- Icon theme: Yaru-Grey
- Pantalla de bienvenida (splash): Monochrome
+echo " Tema Monochrome: Plasma Theme + Decoración de ventanas + Color Scheme + Kvantum + Yakuake
+ Icon theme: YAMIS (Yet Another Monochrome Icon Set)
  Pantalla de inicio de sesión (SDDM): Monochrome"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
