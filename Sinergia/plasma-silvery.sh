@@ -177,10 +177,10 @@ echo "==> Instalando paquetes adicionales..."
 yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git --noconfirm
 
 # ==========================================
-# 5.1 TEMA GLOBAL SILVERY-DARK-GLOBAL-6 + DECORACIÓN BREEZE + SDDM SILVERY-SDDM-6
+# 5.1 TEMA GLOBAL COLLOID-KDE (DARK) + DECORACIÓN BREEZE
 # ==========================================
-echo "==> Instalando el tema Silvery (Plasma Themes de L4ki)..."
-SILVERY_TMP=$(sudo -u "$REAL_USER" mktemp -d)
+echo "==> Instalando el tema Colloid (vinceliuice) - confirmado en su repo de git..."
+COLLOID_TMP=$(sudo -u "$REAL_USER" mktemp -d)
 USER_UID=$(id -u "$REAL_USER")
 RUNTIME_DIR="/run/user/$USER_UID"
 if [ ! -d "$RUNTIME_DIR" ]; then
@@ -189,24 +189,24 @@ fi
 
 GLOBALTHEME_ID="org.kde.breezedark.desktop"
 
-if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/L4ki/Silvery-Plasma-Themes.git "$SILVERY_TMP/repo"; then
+if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/vinceliuice/Colloid-kde.git "$COLLOID_TMP/repo"; then
+    # El propio install.sh del proyecto arma el paquete de Tema Global (look-and-feel)
+    # junto con Plasma Theme, Aurorae y Kvantum, y los copia a $HOME
+    sudo -u "$REAL_USER" bash -c "cd '$COLLOID_TMP/repo' && bash install.sh -c dark" || \
+        sudo -u "$REAL_USER" bash -c "cd '$COLLOID_TMP/repo' && bash install.sh" || \
+        echo "==> Aviso: install.sh de Colloid devolvió un error, se intentará continuar igual."
 
-    # --- Tema Global ---
-    GLOBALTHEME_SRC=$(find "$SILVERY_TMP/repo" -type d -iname "Silvery-Dark-Global-6" 2>/dev/null | head -n1 || true)
-    [ -n "$GLOBALTHEME_SRC" ] || GLOBALTHEME_SRC=$(find "$SILVERY_TMP/repo" -type d -iname "*Silvery*Global*6*" 2>/dev/null | head -n1 || true)
+    LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
+    GLOBALTHEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*colloid*dark*" 2>/dev/null | head -n1 || true)
+    [ -n "$GLOBALTHEME_SRC" ] || GLOBALTHEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*colloid*" 2>/dev/null | head -n1 || true)
     echo "==> Carpeta de Tema Global detectada: ${GLOBALTHEME_SRC:-(ninguna)}"
 
     if [ -n "$GLOBALTHEME_SRC" ]; then
-        LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-        sudo -u "$REAL_USER" mkdir -p "$LOOKANDFEEL_DIR"
-        sudo -u "$REAL_USER" rm -rf "$LOOKANDFEEL_DIR/Silvery-Dark-Global-6"
-        sudo -u "$REAL_USER" cp -r "$GLOBALTHEME_SRC" "$LOOKANDFEEL_DIR/Silvery-Dark-Global-6"
-
-        METADATA_FILE="$LOOKANDFEEL_DIR/Silvery-Dark-Global-6/metadata.desktop"
-        [ -f "$METADATA_FILE" ] || METADATA_FILE="$LOOKANDFEEL_DIR/Silvery-Dark-Global-6/metadata.json"
+        METADATA_FILE="$GLOBALTHEME_SRC/metadata.desktop"
+        [ -f "$METADATA_FILE" ] || METADATA_FILE="$GLOBALTHEME_SRC/metadata.json"
         GLOBALTHEME_ID=$(grep -m1 -E "\"?X-KDE-PluginInfo-Name\"?[=:]" "$METADATA_FILE" 2>/dev/null | sed -E 's/.*[=:]\s*"?([^",]+)"?.*/\1/' || true)
         GLOBALTHEME_ID=$(echo "$GLOBALTHEME_ID" | tr -d '[:space:]')
-        GLOBALTHEME_ID=${GLOBALTHEME_ID:-Silvery-Dark-Global-6}
+        GLOBALTHEME_ID=${GLOBALTHEME_ID:-$(basename "$GLOBALTHEME_SRC")}
         echo "==> ID del Tema Global a aplicar: $GLOBALTHEME_ID"
 
         if command -v plasma-apply-lookandfeel &>/dev/null; then
@@ -228,29 +228,12 @@ if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/L4ki/Silvery-Plas
         fi
         echo "==> $GLOBALTHEME_ID fijado como Tema Global por defecto."
     else
-        echo "==> Aviso: no se encontró Silvery-Dark-Global-6 en el repositorio, se mantiene Breeze Dark."
-    fi
-
-    # --- SDDM ---
-    SDDM_SRC=$(find "$SILVERY_TMP/repo" -type d -iname "Silvery-SDDM-6" 2>/dev/null | head -n1 || true)
-    [ -n "$SDDM_SRC" ] || SDDM_SRC=$(find "$SILVERY_TMP/repo" -type d -iname "*Silvery*SDDM*" 2>/dev/null | head -n1 || true)
-    echo "==> Carpeta de tema SDDM detectada: ${SDDM_SRC:-(ninguna)}"
-
-    if [ -n "$SDDM_SRC" ]; then
-        SDDM_ID=$(basename "$SDDM_SRC")
-        sudo mkdir -p /usr/share/sddm/themes
-        sudo rm -rf "/usr/share/sddm/themes/$SDDM_ID"
-        sudo cp -r "$SDDM_SRC" "/usr/share/sddm/themes/$SDDM_ID"
-        sudo mkdir -p /etc/sddm.conf.d
-        sudo bash -c "printf '[Theme]\nCurrent=%s\n' '$SDDM_ID' > /etc/sddm.conf.d/kde_theme.conf"
-        echo "==> Tema SDDM $SDDM_ID instalado y fijado como pantalla de inicio de sesión."
-    else
-        echo "==> Aviso: no se encontró Silvery-SDDM-6 en el repositorio, se omite el tema de SDDM."
+        echo "==> Aviso: no se encontró ningún Tema Global de Colloid instalado, se mantiene Breeze Dark."
     fi
 else
-    echo "==> Aviso: no se pudo clonar el repositorio de Silvery, se mantiene Breeze Dark y SDDM sin cambios."
+    echo "==> Aviso: no se pudo clonar el repositorio de Colloid, se mantiene Breeze Dark."
 fi
-rm -rf "$SILVERY_TMP"
+rm -rf "$COLLOID_TMP"
 
 # --- Decoración de ventanas: Breeze ---
 echo "==> Fijando Breeze como decoración de ventanas por defecto..."
@@ -559,9 +542,8 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: SDDM"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema Global: Silvery-Dark-Global-6
+echo " Tema Global: Colloid (dark) - vinceliuice
  Decoración de ventanas: Breeze
- Pantalla de inicio de sesión (SDDM): Silvery-SDDM-6
  Icon theme: YAMIS con ícono de lanzador Arch Linux en blanco
  Konsole: transparencia por defecto (Opacity=0.85)
  Fondo de pantalla: ARCH_2__1920x1080"
