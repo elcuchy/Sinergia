@@ -422,11 +422,38 @@ fi
 echo "==> Fondo 'Cold Ripple' de Risto Saukonpää configurado por defecto."
 
 # ==========================================
-# 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
+# 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
 # ==========================================
-echo "==> Configurando sddm como display manager por defecto..."
+echo "==> Instalando y configurando el tema Monochrome para SDDM (Plasma 6)..."
 
-# Si hay otro DM habilitado, lo deshabilitamos para evitar conflictos
+SDDM_TMP=$(mktemp -d)
+if git clone --depth 1 https://github.com/pwyde/monochrome-kde.git "$SDDM_TMP/monochrome-kde"; then
+    if [ -d "$SDDM_TMP/monochrome-kde/sddm/Monochrome" ]; then
+        sudo mkdir -p /usr/share/sddm/themes/monochrome
+        sudo cp -r "$SDDM_TMP/monochrome-kde/sddm/Monochrome/"* /usr/share/sddm/themes/monochrome/
+        echo "==> Archivos de tema SDDM Monochrome instalados en /usr/share/sddm/themes/monochrome."
+    elif [ -d "$SDDM_TMP/monochrome-kde/sddm" ]; then
+        sudo mkdir -p /usr/share/sddm/themes/monochrome
+        sudo cp -r "$SDDM_TMP/monochrome-kde/sddm/"* /usr/share/sddm/themes/monochrome/
+        echo "==> Archivos de tema SDDM Monochrome instalados."
+    else
+        echo "==> Aviso: No se encontró la carpeta SDDM dentro del repositorio."
+    fi
+else
+    echo "==> Aviso: No se pudo clonar el repositorio monochrome-kde."
+fi
+rm -rf "$SDDM_TMP"
+
+# Establecer Monochrome como el tema activo en la configuración de SDDM
+echo "==> Configurando /etc/sddm.conf.d/theme.conf.user..."
+sudo mkdir -p /etc/sddm.conf.d
+sudo bash -c 'cat > /etc/sddm.conf.d/theme.conf.user' << EOF
+[Theme]
+Current=monochrome
+EOF
+
+echo "==> Habilitando SDDM como Display Manager..."
+# Deshabilitar otros DMs si están activos para evitar conflictos
 for dm in entrance gdm lightdm; do
     if systemctl is-enabled "$dm" &>/dev/null; then
         echo "==> Deshabilitando $dm..."
@@ -435,13 +462,6 @@ for dm in entrance gdm lightdm; do
 done
 
 sudo systemctl enable sddm
-
-echo "==> Configurando GRUB para detectar otros SO..."
-if [ -f /etc/default/grub ]; then
-    sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
-    sudo grub-mkconfig -o /boot/grub/grub.cfg
-fi
-
 
 # ==========================================
 # 6.1 DESACTIVAR KDE WALLET POR DEFECTO
