@@ -29,11 +29,14 @@ fetch_kde_store_file() {
 
     if [ -z "$url" ]; then
         echo "==> Aviso: no se pudo obtener el link de descarga para el contenido $content_id de la KDE Store."
+        echo "==> Respuesta cruda de la API (primeros 500 caracteres) para diagnosticar:"
+        echo "${api_xml:0:500}"
         return 1
     fi
 
+    echo "==> Link de descarga obtenido para $content_id: $url"
     if curl -sL -o "$outfile" "$url"; then
-        echo "==> Descargado desde la KDE Store (id $content_id): $outfile"
+        echo "==> Descargado desde la KDE Store (id $content_id): $outfile ($(du -h "$outfile" 2>/dev/null | cut -f1))"
         return 0
     else
         echo "==> Aviso: falló la descarga desde $url"
@@ -230,15 +233,25 @@ if [ ! -d "$RUNTIME_DIR" ]; then
     RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
 fi
 
-GLOBALTHEME_ID="Vortex-Global-6"
+GLOBALTHEME_ID=""
 VORTEX_TMP=$(sudo -u "$REAL_USER" mktemp -d)
+LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
 
 if fetch_kde_store_file 2148697 "$VORTEX_TMP/Vortex-Global-6.pkg"; then
-    LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-    sudo -u "$REAL_USER" mkdir -p "$LOOKANDFEEL_DIR"
-    sudo -u "$REAL_USER" rm -rf "$LOOKANDFEEL_DIR/Vortex-Global-6"
-    if sudo -u "$REAL_USER" bash -c "$(declare -f extract_tar_auto); extract_tar_auto '$VORTEX_TMP/Vortex-Global-6.pkg' '$LOOKANDFEEL_DIR'"; then
-        echo "==> Vortex-Global-6 extraído correctamente en $LOOKANDFEEL_DIR."
+    echo "==> Tipo de archivo descargado: $(file -b "$VORTEX_TMP/Vortex-Global-6.pkg")"
+    sudo -u "$REAL_USER" mkdir -p "$LOOKANDFEEL_DIR" "$VORTEX_TMP/extracted"
+    if sudo -u "$REAL_USER" bash -c "$(declare -f extract_tar_auto); extract_tar_auto '$VORTEX_TMP/Vortex-Global-6.pkg' '$VORTEX_TMP/extracted'"; then
+        echo "==> Contenido extraído (nivel superior): $(ls -1 "$VORTEX_TMP/extracted" | tr '\n' ' ')"
+        # Buscar la carpeta real del look-and-feel (identificada por tener metadata.desktop o metadata.json)
+        DETECTED_DIR=$(find "$VORTEX_TMP/extracted" -maxdepth 2 -type f \( -name "metadata.desktop" -o -name "metadata.json" \) 2>/dev/null | head -n1 | xargs -r dirname || true)
+        if [ -n "$DETECTED_DIR" ]; then
+            GLOBALTHEME_ID=$(basename "$DETECTED_DIR")
+            sudo -u "$REAL_USER" rm -rf "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID"
+            sudo -u "$REAL_USER" cp -r "$DETECTED_DIR" "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID"
+            echo "==> Tema Global instalado como: $GLOBALTHEME_ID"
+        else
+            echo "==> Aviso: no se encontró ningún metadata.desktop/json dentro del paquete extraído."
+        fi
     else
         echo "==> Aviso: no se pudo extraer el paquete descargado de Vortex-Global-6."
     fi
@@ -247,8 +260,7 @@ else
 fi
 rm -rf "$VORTEX_TMP"
 
-LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-if [ -d "$LOOKANDFEEL_DIR/Vortex-Global-6" ]; then
+if [ -n "$GLOBALTHEME_ID" ] && [ -d "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID" ]; then
     if command -v plasma-apply-lookandfeel &>/dev/null; then
         echo "==> Ejecutando plasma-apply-lookandfeel -a $GLOBALTHEME_ID (modo offscreen)..."
         if sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
@@ -432,23 +444,30 @@ echo "==> Descargando el fondo de pantalla Vortex-Wallpaper desde la KDE Store..
 WALLPAPER_TMP=$(mktemp -d)
 WALLPAPER_OK=0
 
+echo "==> Intentando con content id 1493412..."
 if fetch_kde_store_file 1493412 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
     WALLPAPER_OK=1
-elif fetch_kde_store_file 1493413 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
-    WALLPAPER_OK=1
+else
+    echo "==> Intentando con content id 1493413 (respaldo)..."
+    if fetch_kde_store_file 1493413 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
+        WALLPAPER_OK=1
+    fi
 fi
 
 sudo mkdir -p /usr/share/wallpapers
 
 if [ "$WALLPAPER_OK" = "1" ]; then
+    echo "==> Tipo de archivo descargado: $(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")"
     # El archivo descargado puede ser directamente la imagen, o un paquete
     # comprimido que contiene "Vortex-Wallpaper.png" adentro. Se detectan ambos casos.
     if file "$WALLPAPER_TMP/vortex-wallpaper.pkg" | grep -qi "PNG image"; then
         sudo cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" /usr/share/wallpapers/Vortex-Wallpaper.png
     else
-        extract_tar_auto "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_TMP/extracted" 2>/dev/null
+        mkdir -p "$WALLPAPER_TMP/extracted"
+        extract_tar_auto "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_TMP/extracted" 2>&1 || true
+        echo "==> Contenido extraído del wallpaper (recursivo): $(find "$WALLPAPER_TMP/extracted" -type f 2>/dev/null | tr '\n' ' ')"
         FOUND_PNG=$(find "$WALLPAPER_TMP/extracted" -iname "Vortex-Wallpaper*.png" 2>/dev/null | head -n1 || true)
-        [ -n "$FOUND_PNG" ] || FOUND_PNG=$(find "$WALLPAPER_TMP/extracted" -iname "*.png" -o -iname "*.jpg" 2>/dev/null | head -n1 || true)
+        [ -n "$FOUND_PNG" ] || FOUND_PNG=$(find "$WALLPAPER_TMP/extracted" \( -iname "*.png" -o -iname "*.jpg" \) 2>/dev/null | head -n1 || true)
         if [ -n "$FOUND_PNG" ]; then
             sudo cp "$FOUND_PNG" /usr/share/wallpapers/Vortex-Wallpaper.png
         else
@@ -476,11 +495,22 @@ rm -rf "$WALLPAPER_TMP"
 echo "==> Descargando e instalando el tema Vortex-SDDM-6 desde la KDE Store..."
 
 SDDM_TMP=$(mktemp -d)
+SDDM_THEME_ID=""
 if fetch_kde_store_file 2148693 "$SDDM_TMP/Vortex-SDDM-6.pkg"; then
-    sudo mkdir -p /usr/share/sddm/themes
-    sudo rm -rf /usr/share/sddm/themes/Vortex-SDDM-6
-    if extract_tar_auto "$SDDM_TMP/Vortex-SDDM-6.pkg" /usr/share/sddm/themes; then
-        echo "==> Vortex-SDDM-6 instalado en /usr/share/sddm/themes/Vortex-SDDM-6."
+    echo "==> Tipo de archivo descargado: $(file -b "$SDDM_TMP/Vortex-SDDM-6.pkg")"
+    mkdir -p "$SDDM_TMP/extracted"
+    if extract_tar_auto "$SDDM_TMP/Vortex-SDDM-6.pkg" "$SDDM_TMP/extracted"; then
+        echo "==> Contenido extraído (nivel superior): $(ls -1 "$SDDM_TMP/extracted" | tr '\n' ' ')"
+        DETECTED_SDDM_DIR=$(find "$SDDM_TMP/extracted" -maxdepth 2 -type f -name "metadata.desktop" 2>/dev/null | head -n1 | xargs -r dirname || true)
+        if [ -n "$DETECTED_SDDM_DIR" ]; then
+            SDDM_THEME_ID=$(basename "$DETECTED_SDDM_DIR")
+            sudo mkdir -p /usr/share/sddm/themes
+            sudo rm -rf "/usr/share/sddm/themes/$SDDM_THEME_ID"
+            sudo cp -r "$DETECTED_SDDM_DIR" "/usr/share/sddm/themes/$SDDM_THEME_ID"
+            echo "==> Tema SDDM instalado como: $SDDM_THEME_ID"
+        else
+            echo "==> Aviso: no se encontró ningún metadata.desktop dentro del paquete SDDM extraído."
+        fi
     else
         echo "==> Aviso: no se pudo extraer el paquete descargado de Vortex-SDDM-6."
     fi
@@ -489,12 +519,12 @@ else
 fi
 rm -rf "$SDDM_TMP"
 
-if [ -d /usr/share/sddm/themes/Vortex-SDDM-6 ]; then
+if [ -n "$SDDM_THEME_ID" ] && [ -d "/usr/share/sddm/themes/$SDDM_THEME_ID" ]; then
     echo "==> Configurando /etc/sddm.conf.d/theme.conf.user..."
     sudo mkdir -p /etc/sddm.conf.d
-    sudo bash -c 'cat > /etc/sddm.conf.d/theme.conf.user' << EOF
+    sudo bash -c "cat > /etc/sddm.conf.d/theme.conf.user" << EOF
 [Theme]
-Current=Vortex-SDDM-6
+Current=$SDDM_THEME_ID
 EOF
 fi
 
@@ -540,8 +570,8 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: SDDM"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema Global: Vortex-Global-6 (con splash embebido)
- Pantalla de inicio de sesión (SDDM): Vortex-SDDM-6
+echo " Tema Global: ${GLOBALTHEME_ID:-(no se pudo instalar, revisar salida arriba)}
+ Pantalla de inicio de sesión (SDDM): ${SDDM_THEME_ID:-(no se pudo instalar, revisar salida arriba)}
  Icon theme: Vortex-Dark-Icons con ícono de lanzador Arch Linux
  Konsole: transparencia por defecto (Opacity=0.85)
  Fondo de pantalla: Vortex-Wallpaper.png"
