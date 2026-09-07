@@ -174,30 +174,34 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git silvery-dark-kde-git --noconfirm
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin fetch-git silvery-dark-kde-git --noconfirm
 
 
 # ==========================================
-# 5.1 TEMA GLOBAL Y PANTALLA DE BIENVENIDA SILVERY-DARK
+# 5.1 TEMA GLOBAL, ICONOS Y PANTALLA DE BIENVENIDA SILVERY
 # ==========================================
-echo "==> Fijando Silvery-Dark-Global-6 como Tema Global y Splash por defecto..."
+echo "==> Configurando Silvery-Dark-Global-6 (Tema Global, Iconos y Splash)..."
+
 SILVERY_GLOBAL_ID="Silvery-Dark-Global-6"
 USER_UID=$(id -u "$REAL_USER")
 RUNTIME_DIR="/run/user/$USER_UID"
+
 if [ ! -d "$RUNTIME_DIR" ]; then
     RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
 fi
 
 sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
 
-# Aplicar Look and Feel si hay sesión gráfica activa
+# Aplicar Tema Global de Silvery
 if command -v plasma-apply-lookandfeel &>/dev/null; then
     sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
         plasma-apply-lookandfeel -a "$SILVERY_GLOBAL_ID" || true
 fi
 
-# Configuración persistente en kdeglobals
+# Configuración en kdeglobals (Tema Global e Iconos)
 KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+
+# 1. Configurar Tema Global (LookAndFeelPackage)
 if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
     if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
         sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$SILVERY_GLOBAL_ID|" "$KDEGLOBALS"
@@ -208,116 +212,28 @@ else
     sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$SILVERY_GLOBAL_ID' >> '$KDEGLOBALS'"
 fi
 
-# Configuración de Splash / Pantalla de bienvenida
+# 2. Configurar Iconos por defecto de Silvery
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
+    if grep -q "^Theme=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$SILVERY_GLOBAL_ID|" "$KDEGLOBALS"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$SILVERY_GLOBAL_ID" "$KDEGLOBALS"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$SILVERY_GLOBAL_ID' >> '$KDEGLOBALS'"
+fi
+
+# 3. Pantalla de bienvenida (KSplash)
 KSPLASH="$USER_HOME/.config/ksplashrc"
 sudo -u "$REAL_USER" bash -c "cat > '$KSPLASH'" << EOF
 [KSplash]
 Engine=KSplashQML
 Theme=$SILVERY_GLOBAL_ID
 EOF
-echo "==> Silvery-Dark-Global-6 y Pantalla de bienvenida configurados."
 
 
 # ==========================================
-# 5.2 ICONOS YAMIS POR DEFECTO + ÍCONO DE LANZADOR ARCH LINUX
-# ==========================================
-echo "==> Configurando iconos YAMIS por defecto..."
-YAMIS_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d \( -iname "*yamis*" -o -iname "*yet*monochrome*" -o -iname "*another-monochrome*" \) 2>/dev/null | head -n1 || true)
-echo "==> Carpeta de iconos YAMIS detectada: ${YAMIS_DIR:-(ninguna)}"
-
-ICON_THEME_ID="YAMIS"
-if [ -n "$YAMIS_DIR" ]; then
-    ICON_THEME_ID=$(basename "$YAMIS_DIR")
-else
-    echo "==> Aviso: no se encontró la carpeta de YAMIS instalada, se usará el nombre 'YAMIS' de todos modos por si el paquete la crea más tarde."
-fi
-
-# Buscar el archivo archlinux-logo que ya está presente en el sistema
-echo "==> Buscando el archivo archlinux-logo ya presente en el sistema..."
-ARCH_LOGO_FILE="/usr/share/icons/yet-another-monochrome-icon-set/apps/scalable/archlinux.svg"
-if [ ! -f "$ARCH_LOGO_FILE" ]; then
-    echo "==> Aviso: no se encontró el archlinux.svg de YAMIS en la ruta esperada, se amplía la búsqueda..."
-    ARCH_LOGO_FILE=$(find /usr/share "$USER_HOME" -iname "archlinux-logo*" -type f \( -iname "*.svg" -o -iname "*.png" -o -iname "*.svgz" \) 2>/dev/null | head -n1 || true)
-    if [ -z "$ARCH_LOGO_FILE" ]; then
-        ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -iname "archlinux.svg" -type f 2>/dev/null | head -n1 || true)
-    fi
-fi
-echo "==> Archivo archlinux-logo detectado: ${ARCH_LOGO_FILE:-(ninguno)}"
-
-if [ -n "$ARCH_LOGO_FILE" ]; then
-    ARCH_LOGO_EXT="${ARCH_LOGO_FILE##*.}"
-
-    LAUNCHER_THEME_DIR="$USER_HOME/.local/share/icons/YAMIS-ArchLauncher"
-    sudo -u "$REAL_USER" mkdir -p "$LAUNCHER_THEME_DIR/scalable/apps" "$LAUNCHER_THEME_DIR/scalable/places"
-    for name in start-here-kde-plasma start-here-kde start-here; do
-        sudo -u "$REAL_USER" cp "$ARCH_LOGO_FILE" "$LAUNCHER_THEME_DIR/scalable/apps/$name.$ARCH_LOGO_EXT"
-        sudo -u "$REAL_USER" cp "$ARCH_LOGO_FILE" "$LAUNCHER_THEME_DIR/scalable/places/$name.$ARCH_LOGO_EXT"
-    done
-    sudo -u "$REAL_USER" bash -c "cat > '$LAUNCHER_THEME_DIR/index.theme'" << EOF
-[Icon Theme]
-Name=YAMIS with Arch Launcher
-Comment=YAMIS icon set with the Arch Linux launcher icon
-Inherits=$ICON_THEME_ID,hicolor
-Directories=scalable/apps,scalable/places
-
-[scalable/apps]
-Size=64
-MinSize=8
-MaxSize=512
-Type=Scalable
-Context=Applications
-
-[scalable/places]
-Size=64
-MinSize=8
-MaxSize=512
-Type=Scalable
-Context=Places
-EOF
-    echo "==> Tema de iconos compuesto YAMIS-ArchLauncher creado (hereda de $ICON_THEME_ID)."
-    ICON_THEME_ID="YAMIS-ArchLauncher"
-
-    LAYOUT_JS="/usr/share/plasma/shells/org.kde.plasma.desktop/contents/layout.js"
-    if [ -f "$LAYOUT_JS" ]; then
-        sudo cp "$LAYOUT_JS" "$LAYOUT_JS.bak_orig" 2>/dev/null || true
-        sudo awk -v iconpath="$ARCH_LOGO_FILE" '
-            {
-                print
-                if ($0 ~ /addWidget\("org\.kde\.plasma\.kickoff"\)/) {
-                    varname = $0
-                    sub(/^[ \t]*(var|let|const)[ \t]+/, "", varname)
-                    sub(/[ \t]*=.*/, "", varname)
-                    if (varname != "" && varname !~ / /) {
-                        print varname ".currentConfigGroup = [\"General\"];"
-                        print varname ".writeConfig(\"icon\", \"" iconpath "\");"
-                    }
-                }
-            }
-        ' "$LAYOUT_JS.bak_orig" | sudo tee "$LAYOUT_JS" > /dev/null
-        echo "==> layout.js parcheado para usar $ARCH_LOGO_FILE como ícono del lanzador de aplicaciones."
-    else
-        echo "==> Aviso: no se encontró layout.js en la ruta esperada, se omite el parche del lanzador."
-    fi
-else
-    echo "==> Aviso: no se encontró ningún archivo archlinux-logo en el sistema, se usará YAMIS sin ícono de lanzador personalizado."
-fi
-
-KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
-    if grep -q "^Theme=" "$KDEGLOBALS"; then
-        sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$ICON_THEME_ID|" "$KDEGLOBALS"
-    else
-        sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$ICON_THEME_ID" "$KDEGLOBALS"
-    fi
-else
-    sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$ICON_THEME_ID' >> '$KDEGLOBALS'"
-fi
-echo "==> Icon theme $ICON_THEME_ID fijado por defecto."
-
-
-# ==========================================
-# 5.3 TRANSPARENCIA POR DEFECTO EN KONSOLE
+# 5.2 TRANSPARENCIA POR DEFECTO EN KONSOLE
 # ==========================================
 echo "==> Configurando transparencia por defecto en Konsole..."
 KONSOLE_DATA_DIR="$USER_HOME/.local/share/konsole"
@@ -328,9 +244,9 @@ TRANSPARENT_SCHEME="$KONSOLE_DATA_DIR/BreezeTransparent.colorscheme"
 if [ -f "$BASE_COLORSCHEME" ]; then
     sudo -u "$REAL_USER" cp "$BASE_COLORSCHEME" "$TRANSPARENT_SCHEME"
 else
-    echo "==> Aviso: no se encontró el color scheme base de Breeze, se crea uno mínimo."
     sudo -u "$REAL_USER" bash -c "printf '[Background]\nColor=35,38,41\n[Foreground]\nColor=252,252,252\n[General]\nDescription=BreezeTransparent\n' > '$TRANSPARENT_SCHEME'"
 fi
+
 if grep -q "^\[General\]" "$TRANSPARENT_SCHEME" && grep -q "^Opacity=" "$TRANSPARENT_SCHEME"; then
     sudo -u "$REAL_USER" sed -i "s|^Opacity=.*|Opacity=0.85|" "$TRANSPARENT_SCHEME"
 elif grep -q "^\[General\]" "$TRANSPARENT_SCHEME"; then
@@ -353,9 +269,7 @@ if [ -f "$KONSOLERC" ] && grep -q "^\[Desktop Entry\]" "$KONSOLERC"; then
 else
     sudo -u "$REAL_USER" bash -c "printf '[Desktop Entry]\nDefaultProfile=Transparent.profile\n' >> '$KONSOLERC'"
 fi
-echo "==> Konsole configurado con transparencia (Opacity=0.85) como perfil por defecto."
 
-# Habilitar el efecto de escritorio Blur
 KWINRC="$USER_HOME/.config/kwinrc"
 sudo -u "$REAL_USER" touch "$KWINRC"
 if grep -q "^\[Plugins\]" "$KWINRC" 2>/dev/null; then
@@ -370,9 +284,9 @@ fi
 
 
 # ==========================================
-# 5.4 FONDO DE PANTALLA SILVERY CON LOGO KDE
+# 5.3 FONDO DE PANTALLA SILVERY CON LOGO KDE
 # ==========================================
-echo "==> Configurando fondo Silvery-Wallpaper-With-KDE-Plasma-Logo-2..."
+echo "==> Configurando fondo Silvery-Wallpaper-With-KDE-Plasma-Logo-2 por defecto..."
 
 WALLPAPER_NAME="Silvery-Wallpaper-With-KDE-Plasma-Logo-2"
 PLASMRC="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
@@ -402,11 +316,10 @@ ImageName=$WALLPAPER_NAME
 EOF
     fi
 fi
-echo "==> Fondo de pantalla Silvery configurado por defecto."
 
 
 # ==========================================
-# 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
+# 6. CONFIGURACIÓN DE SDDM Y GRUB
 # ==========================================
 echo "==> Configurando Silvery-SDDM-6 en la pantalla de inicio de sesión..."
 
@@ -416,7 +329,7 @@ sudo bash -c 'cat > /etc/sddm.conf.d/theme.conf.user' << EOF
 Current=Silvery-SDDM-6
 EOF
 
-echo "==> Habilitando SDDM como Display Manager..."
+echo "==> Habilitando SDDM..."
 for dm in entrance gdm lightdm; do
     if systemctl is-enabled "$dm" &>/dev/null; then
         echo "==> Deshabilitando $dm..."
@@ -455,6 +368,7 @@ else
 fi
 
 
+
 # ==========================================
 # 7. LIMPIEZA Y REINICIO
 # ==========================================
@@ -466,7 +380,6 @@ echo " Display manager configurado: SDDM (Silvery-SDDM-6)"
 echo " KDE Wallet: desactivado por defecto"
 echo " Tema Global: Silvery-Dark-Global-6"
 echo " Pantalla de bienvenida: Silvery-Dark-Global-6"
-echo " Icon theme: YAMIS con ícono de lanzador Arch Linux"
 echo " Konsole: transparencia por defecto (Opacity=0.85)"
 echo " Fondo de pantalla: Silvery-Wallpaper-With-KDE-Plasma-Logo-2"
 echo "  
