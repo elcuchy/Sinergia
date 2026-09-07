@@ -174,84 +174,49 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git --noconfirm
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git silvery-dark-kde-git --noconfirm
+
 
 # ==========================================
-# 5.1 TEMA GLOBAL COLLOID-KDE (DARK) + DECORACIÓN BREEZE
+# 5.1 TEMA GLOBAL Y PANTALLA DE BIENVENIDA SILVERY-DARK
 # ==========================================
-echo "==> Instalando el tema Colloid (vinceliuice) - confirmado en su repo de git..."
-COLLOID_TMP=$(sudo -u "$REAL_USER" mktemp -d)
+echo "==> Fijando Silvery-Dark-Global-6 como Tema Global y Splash por defecto..."
+SILVERY_GLOBAL_ID="Silvery-Dark-Global-6"
 USER_UID=$(id -u "$REAL_USER")
 RUNTIME_DIR="/run/user/$USER_UID"
 if [ ! -d "$RUNTIME_DIR" ]; then
     RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
 fi
 
-GLOBALTHEME_ID="org.kde.breezedark.desktop"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
 
-if sudo -u "$REAL_USER" git clone --depth 1 https://github.com/vinceliuice/Colloid-kde.git "$COLLOID_TMP/repo"; then
-    # El propio install.sh del proyecto arma el paquete de Tema Global (look-and-feel)
-    # junto con Plasma Theme, Aurorae y Kvantum, y los copia a $HOME
-    sudo -u "$REAL_USER" bash -c "cd '$COLLOID_TMP/repo' && bash install.sh -c dark" || \
-        sudo -u "$REAL_USER" bash -c "cd '$COLLOID_TMP/repo' && bash install.sh" || \
-        echo "==> Aviso: install.sh de Colloid devolvió un error, se intentará continuar igual."
+# Aplicar Look and Feel si hay sesión gráfica activa
+if command -v plasma-apply-lookandfeel &>/dev/null; then
+    sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+        plasma-apply-lookandfeel -a "$SILVERY_GLOBAL_ID" || true
+fi
 
-    LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-    GLOBALTHEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*colloid*dark*" 2>/dev/null | head -n1 || true)
-    [ -n "$GLOBALTHEME_SRC" ] || GLOBALTHEME_SRC=$(find "$LOOKANDFEEL_DIR" -maxdepth 1 -type d -iname "*colloid*" 2>/dev/null | head -n1 || true)
-    echo "==> Carpeta de Tema Global detectada: ${GLOBALTHEME_SRC:-(ninguna)}"
-
-    if [ -n "$GLOBALTHEME_SRC" ]; then
-        METADATA_FILE="$GLOBALTHEME_SRC/metadata.desktop"
-        [ -f "$METADATA_FILE" ] || METADATA_FILE="$GLOBALTHEME_SRC/metadata.json"
-        GLOBALTHEME_ID=$(grep -m1 -E "\"?X-KDE-PluginInfo-Name\"?[=:]" "$METADATA_FILE" 2>/dev/null | sed -E 's/.*[=:]\s*"?([^",]+)"?.*/\1/' || true)
-        GLOBALTHEME_ID=$(echo "$GLOBALTHEME_ID" | tr -d '[:space:]')
-        GLOBALTHEME_ID=${GLOBALTHEME_ID:-$(basename "$GLOBALTHEME_SRC")}
-        echo "==> ID del Tema Global a aplicar: $GLOBALTHEME_ID"
-
-        if command -v plasma-apply-lookandfeel &>/dev/null; then
-            sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-                plasma-apply-lookandfeel -a "$GLOBALTHEME_ID" || \
-                echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
-        fi
-
-        KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-        if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
-            if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
-                sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$GLOBALTHEME_ID|" "$KDEGLOBALS"
-            else
-                sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$GLOBALTHEME_ID" "$KDEGLOBALS"
-            fi
-        else
-            sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$GLOBALTHEME_ID' >> '$KDEGLOBALS'"
-        fi
-        echo "==> $GLOBALTHEME_ID fijado como Tema Global por defecto."
+# Configuración persistente en kdeglobals
+KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
+    if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$SILVERY_GLOBAL_ID|" "$KDEGLOBALS"
     else
-        echo "==> Aviso: no se encontró ningún Tema Global de Colloid instalado, se mantiene Breeze Dark."
+        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$SILVERY_GLOBAL_ID" "$KDEGLOBALS"
     fi
 else
-    echo "==> Aviso: no se pudo clonar el repositorio de Colloid, se mantiene Breeze Dark."
+    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$SILVERY_GLOBAL_ID' >> '$KDEGLOBALS'"
 fi
-rm -rf "$COLLOID_TMP"
 
-# --- Decoración de ventanas: Breeze ---
-echo "==> Fijando Breeze como decoración de ventanas por defecto..."
-KWINRC="$USER_HOME/.config/kwinrc"
-sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-sudo -u "$REAL_USER" touch "$KWINRC"
-if command -v kwriteconfig6 &>/dev/null; then
-    KWRITECFG=kwriteconfig6
-else
-    KWRITECFG=kwriteconfig5
-fi
-if command -v "$KWRITECFG" &>/dev/null; then
-    sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "library" "org.kde.breeze"
-    sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "theme" "Breeze"
-    echo "==> Decoración de ventanas Breeze fijada por defecto."
-else
-    echo "==> Aviso: no se encontró kwriteconfig6/5, no se pudo fijar la decoración de ventanas."
-fi
+# Configuración de Splash / Pantalla de bienvenida
+KSPLASH="$USER_HOME/.config/ksplashrc"
+sudo -u "$REAL_USER" bash -c "cat > '$KSPLASH'" << EOF
+[KSplash]
+Engine=KSplashQML
+Theme=$SILVERY_GLOBAL_ID
+EOF
+echo "==> Silvery-Dark-Global-6 y Pantalla de bienvenida configurados."
+
 
 # ==========================================
 # 5.2 ICONOS YAMIS POR DEFECTO + ÍCONO DE LANZADOR ARCH LINUX
@@ -267,23 +232,21 @@ else
     echo "==> Aviso: no se encontró la carpeta de YAMIS instalada, se usará el nombre 'YAMIS' de todos modos por si el paquete la crea más tarde."
 fi
 
-# Buscar el ícono archlinux.svg (viene dentro del tema YAMIS) buscando el
-# archivo directamente, sin depender del nombre exacto de la carpeta contenedora
-echo "==> Buscando el ícono archlinux.svg ya presente en el sistema..."
-ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -path "*apps/scalable/archlinux.svg" -type f 2>/dev/null | head -n1 || true)
-if [ -z "$ARCH_LOGO_FILE" ]; then
-    ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -iname "archlinux.svg" -type f 2>/dev/null | head -n1 || true)
-fi
-if [ -z "$ARCH_LOGO_FILE" ]; then
+# Buscar el archivo archlinux-logo que ya está presente en el sistema
+echo "==> Buscando el archivo archlinux-logo ya presente en el sistema..."
+ARCH_LOGO_FILE="/usr/share/icons/yet-another-monochrome-icon-set/apps/scalable/archlinux.svg"
+if [ ! -f "$ARCH_LOGO_FILE" ]; then
+    echo "==> Aviso: no se encontró el archlinux.svg de YAMIS en la ruta esperada, se amplía la búsqueda..."
     ARCH_LOGO_FILE=$(find /usr/share "$USER_HOME" -iname "archlinux-logo*" -type f \( -iname "*.svg" -o -iname "*.png" -o -iname "*.svgz" \) 2>/dev/null | head -n1 || true)
+    if [ -z "$ARCH_LOGO_FILE" ]; then
+        ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -iname "archlinux.svg" -type f 2>/dev/null | head -n1 || true)
+    fi
 fi
 echo "==> Archivo archlinux-logo detectado: ${ARCH_LOGO_FILE:-(ninguno)}"
 
 if [ -n "$ARCH_LOGO_FILE" ]; then
     ARCH_LOGO_EXT="${ARCH_LOGO_FILE##*.}"
 
-    # Método 1: tema de iconos compuesto que hereda de YAMIS y pisa el ícono
-    # del lanzador (por si Kickoff lo resuelve dinámicamente vía icon-theme)
     LAUNCHER_THEME_DIR="$USER_HOME/.local/share/icons/YAMIS-ArchLauncher"
     sudo -u "$REAL_USER" mkdir -p "$LAUNCHER_THEME_DIR/scalable/apps" "$LAUNCHER_THEME_DIR/scalable/places"
     for name in start-here-kde-plasma start-here-kde start-here; do
@@ -314,9 +277,6 @@ EOF
     echo "==> Tema de iconos compuesto YAMIS-ArchLauncher creado (hereda de $ICON_THEME_ID)."
     ICON_THEME_ID="YAMIS-ArchLauncher"
 
-    # Método 2 (el que realmente decide el ícono por defecto de Kickoff):
-    # editar el script de layout que Plasma ejecuta en el primer inicio de sesión
-    # para forzar el icono del widget del lanzador a la ruta absoluta del archivo.
     LAYOUT_JS="/usr/share/plasma/shells/org.kde.plasma.desktop/contents/layout.js"
     if [ -f "$LAYOUT_JS" ]; then
         sudo cp "$LAYOUT_JS" "$LAYOUT_JS.bak_orig" 2>/dev/null || true
@@ -354,6 +314,7 @@ else
     sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$ICON_THEME_ID' >> '$KDEGLOBALS'"
 fi
 echo "==> Icon theme $ICON_THEME_ID fijado por defecto."
+
 
 # ==========================================
 # 5.3 TRANSPARENCIA POR DEFECTO EN KONSOLE
@@ -394,7 +355,7 @@ else
 fi
 echo "==> Konsole configurado con transparencia (Opacity=0.85) como perfil por defecto."
 
-# Habilitar el efecto de escritorio Blur, para que la transparencia se vea bien
+# Habilitar el efecto de escritorio Blur
 KWINRC="$USER_HOME/.config/kwinrc"
 sudo -u "$REAL_USER" touch "$KWINRC"
 if grep -q "^\[Plugins\]" "$KWINRC" 2>/dev/null; then
@@ -407,94 +368,55 @@ else
     sudo -u "$REAL_USER" bash -c "printf '\n[Plugins]\nblurEnabled=true\n' >> '$KWINRC'"
 fi
 
-# ==========================================
-# 5.4 CLONAR TODOS LOS WALLPAPERS DE AMBOS REPOS Y FIJAR ARCH_2__1920x1080 POR DEFECTO
-# ==========================================
-echo "==> Clonando los repositorios de wallpapers..."
-DEFAULT_WALLPAPER_ID=""
 
-for repo_url in \
-    "https://github.com/UncleSpellbinder/Arch-Linux-HD-Wallpaper.git" \
-    "https://github.com/f4dzN/archlinux-wallpapers.git"; do
+# ==========================================
+# 5.4 FONDO DE PANTALLA SILVERY CON LOGO KDE
+# ==========================================
+echo "==> Configurando fondo Silvery-Wallpaper-With-KDE-Plasma-Logo-2..."
 
-    WALLPAPER_TMP=$(sudo -u "$REAL_USER" mktemp -d)
-    echo "==> Clonando $repo_url ..."
-    if sudo -u "$REAL_USER" git clone --depth 1 "$repo_url" "$WALLPAPER_TMP/repo"; then
-        while IFS= read -r -d '' imgfile; do
-            base="$(basename "$imgfile")"
-            name="${base%.*}"
-            pkgdir="/usr/share/wallpapers/$name"
-            if [ -d "$pkgdir" ]; then
-                echo "==> Aviso: ya existe un wallpaper llamado '$name' (de otro repo), se omite para no sobrescribirlo."
-                continue
-            fi
-            sudo mkdir -p "$pkgdir/contents/images"
-            sudo cp "$imgfile" "$pkgdir/contents/images/$base"
-            sudo bash -c "cat > '$pkgdir/metadata.desktop'" << EOF
-[Desktop Entry]
-Name=$name
-Type=Service
-X-KDE-ServiceTypes=Plasma/Wallpaper
-X-KDE-PluginInfo-Name=$name
+WALLPAPER_NAME="Silvery-Wallpaper-With-KDE-Plasma-Logo-2"
+PLASMRC="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+
+if [ ! -f "$PLASMRC" ] || ! grep -q "\[Containments\]" "$PLASMRC"; then
+    sudo -u "$REAL_USER" bash -c "cat > '$PLASMRC'" << EOF
+[Containments][1]
+activityId=
+wallpaperplugin=org.kde.image
+
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
+ImageName=$WALLPAPER_NAME
 EOF
-            echo "==> Wallpaper instalado: $pkgdir"
-            if [ "$name" = "ARCH_2__1920x1080" ]; then
-                DEFAULT_WALLPAPER_ID="$name"
-            fi
-        done < <(find "$WALLPAPER_TMP/repo" -maxdepth 3 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print0)
-    else
-        echo "==> Aviso: no se pudo clonar $repo_url, se omite este repositorio."
-    fi
-    rm -rf "$WALLPAPER_TMP"
-done
-
-if [ -n "$DEFAULT_WALLPAPER_ID" ]; then
-    # El tema activo ahora es el Global Theme detectado en 5.1 (Silvery, o Breeze Dark si algo falló)
-    LNF_DEFAULTS="$USER_HOME/.local/share/plasma/look-and-feel/$GLOBALTHEME_ID/contents/defaults"
-    if [ ! -f "$LNF_DEFAULTS" ]; then
-        LNF_DEFAULTS="/usr/share/plasma/look-and-feel/$GLOBALTHEME_ID/contents/defaults"
-    fi
-    if [ ! -f "$LNF_DEFAULTS" ]; then
-        LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
-    fi
-    echo "==> Archivo defaults del tema activo detectado: ${LNF_DEFAULTS:-(ninguno)}"
-
-    if [ -f "$LNF_DEFAULTS" ]; then
-        if [[ "$LNF_DEFAULTS" == "$USER_HOME"* ]]; then
-            EDIT_CMD="sudo -u $REAL_USER"
-        else
-            EDIT_CMD="sudo"
-        fi
-        if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
-            if grep -q "^Image=" "$LNF_DEFAULTS"; then
-                $EDIT_CMD sed -i "s|^Image=.*|Image=$DEFAULT_WALLPAPER_ID|" "$LNF_DEFAULTS"
-            else
-                $EDIT_CMD sed -i "/^\[Wallpaper\]/a Image=$DEFAULT_WALLPAPER_ID" "$LNF_DEFAULTS"
-            fi
-        else
-            $EDIT_CMD bash -c "printf '\n[Wallpaper]\nImage=%s\n' '$DEFAULT_WALLPAPER_ID' >> '$LNF_DEFAULTS'"
-        fi
-        echo "==> Fondo de pantalla por defecto cambiado a $DEFAULT_WALLPAPER_ID."
-    else
-        echo "==> Aviso: no se encontró el archivo defaults del tema activo, no se pudo fijar el wallpaper por defecto."
-    fi
-
-    # Intento de aplicación en vivo (solo tiene efecto si hay una sesión de Plasma activa)
-    if command -v plasma-apply-wallpaperimage &>/dev/null; then
-        DEFAULT_WALLPAPER_PATH="/usr/share/wallpapers/$DEFAULT_WALLPAPER_ID/contents/images/ARCH_2__1920x1080.jpg"
-        sudo -u "$REAL_USER" plasma-apply-wallpaperimage "$DEFAULT_WALLPAPER_PATH" || \
-            echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión."
-    fi
 else
-    echo "==> Aviso: no se encontró ARCH_2__1920x1080 entre los wallpapers clonados, no se cambió el wallpaper por defecto."
+    if grep -q "\[Wallpaper\]\[org.kde.image\]\[General\]" "$PLASMRC"; then
+        sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=file:///usr/share/wallpapers/$WALLPAPER_NAME|" "$PLASMRC"
+        sudo -u "$REAL_USER" sed -i "s|^ImageName=.*|ImageName=$WALLPAPER_NAME|" "$PLASMRC"
+    else
+        sudo -u "$REAL_USER" bash -c "cat >> '$PLASMRC'" << EOF
+
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
+ImageName=$WALLPAPER_NAME
+EOF
+    fi
 fi
+echo "==> Fondo de pantalla Silvery configurado por defecto."
+
 
 # ==========================================
-# 6. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
+# 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
 # ==========================================
-echo "==> Configurando sddm como display manager por defecto..."
+echo "==> Configurando Silvery-SDDM-6 en la pantalla de inicio de sesión..."
 
-# Si hay otro DM habilitado, lo deshabilitamos para evitar conflictos
+sudo mkdir -p /etc/sddm.conf.d
+sudo bash -c 'cat > /etc/sddm.conf.d/theme.conf.user' << EOF
+[Theme]
+Current=Silvery-SDDM-6
+EOF
+
+echo "==> Habilitando SDDM como Display Manager..."
 for dm in entrance gdm lightdm; do
     if systemctl is-enabled "$dm" &>/dev/null; then
         echo "==> Deshabilitando $dm..."
@@ -540,13 +462,13 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: SDDM"
+echo " Display manager configurado: SDDM (Silvery-SDDM-6)"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema Global: Colloid (dark) - vinceliuice
- Decoración de ventanas: Breeze
- Icon theme: YAMIS con ícono de lanzador Arch Linux en blanco
- Konsole: transparencia por defecto (Opacity=0.85)
- Fondo de pantalla: ARCH_2__1920x1080"
+echo " Tema Global: Silvery-Dark-Global-6"
+echo " Pantalla de bienvenida: Silvery-Dark-Global-6"
+echo " Icon theme: YAMIS con ícono de lanzador Arch Linux"
+echo " Konsole: transparencia por defecto (Opacity=0.85)"
+echo " Fondo de pantalla: Silvery-Wallpaper-With-KDE-Plasma-Logo-2"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
 S        I    NN  N  E      R   R  G   G    I    A   A
