@@ -185,20 +185,16 @@ echo "==> Instalando tema global Silvery-Dark-Global-6..."
 
 SILVERY_ID="org.kde.silvery-dark-global-6"
 LAF_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-SILVERY_ZIP="$LAF_DIR/Silvery-Dark-Global-6.zip"
 SILVERY_EXTRACTED="$LAF_DIR/silvery-dark-global-6"
 
 sudo -u "$REAL_USER" mkdir -p "$LAF_DIR"
 
-# Descargar el tema global (URL directa de KDE Store / Pling)
+# Descargar desde GitHub (repositorio oficial de L4ki)
 if [ ! -d "$SILVERY_EXTRACTED" ]; then
-    echo "==> Descargando Silvery-Dark-Global-6..."
-    sudo -u "$REAL_USER" curl -L "https://www.pling.com/download?file_id=0&file_name=Silvery-Dark-Global-6.zip" -o "$SILVERY_ZIP" || \
-    sudo -u "$REAL_USER" wget -O "$SILVERY_ZIP" "https://www.pling.com/download?file_id=0&file_name=Silvery-Dark-Global-6.zip"
-    
-    echo "==> Extrayendo tema global..."
-    sudo -u "$REAL_USER" unzip -o "$SILVERY_ZIP" -d "$LAF_DIR"
-    rm -f "$SILVERY_ZIP"
+    echo "==> Descargando Silvery-Dark-Global-6 desde GitHub..."
+    sudo -u "$REAL_USER" git clone https://github.com/L4ki/Silvery-Dark-Global-6.git "$SILVERY_EXTRACTED" || {
+        echo "==> Aviso: No se pudo clonar desde GitHub, se omite este paso."
+    }
 fi
 
 # Aplicar el tema global
@@ -211,7 +207,7 @@ fi
 echo "==> Aplicando Silvery-Dark-Global-6 como Look and Feel..."
 if command -v plasma-apply-lookandfeel &>/dev/null; then
     sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-        plasma-apply-lookandfeel -a "$SILVERY_ID" || \
+        plasma-apply-lookandfeel -a "$SILVERY_ID" 2>/dev/null || \
         echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
 else
     echo "==> Aviso: plasma-apply-lookandfeel no está disponible."
@@ -239,19 +235,15 @@ echo "==> Configurando Kvantum con tema Silvery-Kvantum..."
 
 KVANTUM_DIR="$USER_HOME/.local/share/Kvantum"
 KVANTUM_THEME_DIR="$KVANTUM_DIR/Silvery"
-KVANTUM_ZIP="$KVANTUM_DIR/Silvery.zip"
 
 sudo -u "$REAL_USER" mkdir -p "$KVANTUM_DIR"
 
-# Descargar tema Silvery-Kvantum desde KDE Store
+# Descargar tema Silvery-Kvantum desde GitHub
 if [ ! -d "$KVANTUM_THEME_DIR" ]; then
-    echo "==> Descargando Silvery-Kvantum..."
-    sudo -u "$REAL_USER" curl -L "https://www.pling.com/download?file_id=0&file_name=Silvery-Kvantum.zip" -o "$KVANTUM_ZIP" || \
-    sudo -u "$REAL_USER" wget -O "$KVANTUM_ZIP" "https://www.pling.com/download?file_id=0&file_name=Silvery-Kvantum.zip"
-    
-    echo "==> Extrayendo tema Kvantum..."
-    sudo -u "$REAL_USER" unzip -o "$KVANTUM_ZIP" -d "$KVANTUM_DIR"
-    rm -f "$KVANTUM_ZIP"
+    echo "==> Descargando Silvery-Kvantum desde GitHub..."
+    sudo -u "$REAL_USER" git clone https://github.com/L4ki/Silvery-Kvantum.git "$KVANTUM_THEME_DIR" || {
+        echo "==> Aviso: No se pudo clonar Silvery-Kvantum desde GitHub."
+    }
 fi
 
 # Configurar kvantumrc para usar Silvery como tema por defecto
@@ -284,7 +276,6 @@ else
 fi
 
 echo "==> Kvantum configurado con tema Silvery como engine por defecto."
-
 
 # ==========================================
 # 5.2 ICONOS SILVERY-DARK-ICONS POR DEFECTO
