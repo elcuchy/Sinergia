@@ -142,7 +142,9 @@ sudo pacman -S --noconfirm --needed \
   mate-icon-theme-faenza \
   rustdesk-bin \
   gnome-boxes \
-  os-prober
+  os-prober \
+  plasma-sdk \
+  unzip
 
 
 # ==========================================
@@ -174,66 +176,152 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin fetch-git silvery-dark-kde-git --noconfirm
-
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git --noconfirm
 
 # ==========================================
-# 5.1 TEMA GLOBAL, ICONOS Y PANTALLA DE BIENVENIDA SILVERY
+# 5.1 INSTALAR Y APLICAR SILVERY-DARK-GLOBAL-6
 # ==========================================
-echo "==> Configurando Silvery-Dark-Global-6 (Tema Global, Iconos y Splash)..."
+echo "==> Instalando tema global Silvery-Dark-Global-6..."
 
-SILVERY_GLOBAL_ID="Silvery-Dark-Global-6"
+SILVERY_ID="org.kde.silvery-dark-global-6"
+LAF_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
+SILVERY_ZIP="$LAF_DIR/Silvery-Dark-Global-6.zip"
+SILVERY_EXTRACTED="$LAF_DIR/silvery-dark-global-6"
+
+sudo -u "$REAL_USER" mkdir -p "$LAF_DIR"
+
+# Descargar el tema global (URL directa de KDE Store / Pling)
+if [ ! -d "$SILVERY_EXTRACTED" ]; then
+    echo "==> Descargando Silvery-Dark-Global-6..."
+    sudo -u "$REAL_USER" curl -L "https://www.pling.com/download?file_id=0&file_name=Silvery-Dark-Global-6.zip" -o "$SILVERY_ZIP" || \
+    sudo -u "$REAL_USER" wget -O "$SILVERY_ZIP" "https://www.pling.com/download?file_id=0&file_name=Silvery-Dark-Global-6.zip"
+    
+    echo "==> Extrayendo tema global..."
+    sudo -u "$REAL_USER" unzip -o "$SILVERY_ZIP" -d "$LAF_DIR"
+    rm -f "$SILVERY_ZIP"
+fi
+
+# Aplicar el tema global
 USER_UID=$(id -u "$REAL_USER")
 RUNTIME_DIR="/run/user/$USER_UID"
-
 if [ ! -d "$RUNTIME_DIR" ]; then
     RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
 fi
 
-sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-
-# Aplicar Tema Global de Silvery
+echo "==> Aplicando Silvery-Dark-Global-6 como Look and Feel..."
 if command -v plasma-apply-lookandfeel &>/dev/null; then
     sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-        plasma-apply-lookandfeel -a "$SILVERY_GLOBAL_ID" || true
+        plasma-apply-lookandfeel -a "$SILVERY_ID" || \
+        echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
+else
+    echo "==> Aviso: plasma-apply-lookandfeel no está disponible."
 fi
 
-# Configuración en kdeglobals (Tema Global e Iconos)
+# Respaldo: forzar en kdeglobals
 KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-
-# 1. Configurar Tema Global (LookAndFeelPackage)
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
 if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
     if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
-        sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$SILVERY_GLOBAL_ID|" "$KDEGLOBALS"
+        sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$SILVERY_ID|" "$KDEGLOBALS"
     else
-        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$SILVERY_GLOBAL_ID" "$KDEGLOBALS"
+        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$SILVERY_ID" "$KDEGLOBALS"
     fi
 else
-    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$SILVERY_GLOBAL_ID' >> '$KDEGLOBALS'"
+    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$SILVERY_ID' >> '$KDEGLOBALS'"
 fi
-
-# 2. Configurar Iconos por defecto de Silvery
-if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
-    if grep -q "^Theme=" "$KDEGLOBALS"; then
-        sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$SILVERY_GLOBAL_ID|" "$KDEGLOBALS"
-    else
-        sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$SILVERY_GLOBAL_ID" "$KDEGLOBALS"
-    fi
-else
-    sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$SILVERY_GLOBAL_ID' >> '$KDEGLOBALS'"
-fi
-
-# 3. Pantalla de bienvenida (KSplash)
-KSPLASH="$USER_HOME/.config/ksplashrc"
-sudo -u "$REAL_USER" bash -c "cat > '$KSPLASH'" << EOF
-[KSplash]
-Engine=KSplashQML
-Theme=$SILVERY_GLOBAL_ID
-EOF
+echo "==> Silvery-Dark-Global-6 fijado como Tema Global por defecto."
 
 
 # ==========================================
-# 5.2 TRANSPARENCIA POR DEFECTO EN KONSOLE
+# 5.1A CONFIGURAR TEMA KVANTUM SILVERY
+# ==========================================
+echo "==> Configurando Kvantum con tema Silvery-Kvantum..."
+
+KVANTUM_DIR="$USER_HOME/.local/share/Kvantum"
+KVANTUM_THEME_DIR="$KVANTUM_DIR/Silvery"
+KVANTUM_ZIP="$KVANTUM_DIR/Silvery.zip"
+
+sudo -u "$REAL_USER" mkdir -p "$KVANTUM_DIR"
+
+# Descargar tema Silvery-Kvantum desde KDE Store
+if [ ! -d "$KVANTUM_THEME_DIR" ]; then
+    echo "==> Descargando Silvery-Kvantum..."
+    sudo -u "$REAL_USER" curl -L "https://www.pling.com/download?file_id=0&file_name=Silvery-Kvantum.zip" -o "$KVANTUM_ZIP" || \
+    sudo -u "$REAL_USER" wget -O "$KVANTUM_ZIP" "https://www.pling.com/download?file_id=0&file_name=Silvery-Kvantum.zip"
+    
+    echo "==> Extrayendo tema Kvantum..."
+    sudo -u "$REAL_USER" unzip -o "$KVANTUM_ZIP" -d "$KVANTUM_DIR"
+    rm -f "$KVANTUM_ZIP"
+fi
+
+# Configurar kvantumrc para usar Silvery como tema por defecto
+KVANTUM_RC="$USER_HOME/.config/kvantum.kvconfig"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+
+if [ -f "$KVANTUM_RC" ]; then
+    if grep -q "^\[General\]" "$KVANTUM_RC"; then
+        if grep -q "^theme=" "$KVANTUM_RC"; then
+            sudo -u "$REAL_USER" sed -i 's|^theme=.*|theme=Silvery|' "$KVANTUM_RC"
+        else
+            sudo -u "$REAL_USER" sed -i '/^\[General\]/a theme=Silvery' "$KVANTUM_RC"
+        fi
+    else
+        sudo -u "$REAL_USER" bash -c "printf '[General]\ntheme=Silvery\n' >> '$KVANTUM_RC'"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '[General]\ntheme=Silvery\n' > '$KVANTUM_RC'"
+fi
+
+# Configurar kdeglobals para usar Kvantum como engine de estilo
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[General\]" "$KDEGLOBALS"; then
+    if grep -q "^widgetStyle=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i 's|^widgetStyle=.*|widgetStyle=kvantum|' "$KDEGLOBALS"
+    else
+        sudo -u "$REAL_USER" sed -i '/^\[General\]/a widgetStyle=kvantum' "$KDEGLOBALS"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[General]\nwidgetStyle=kvantum\n' >> '$KDEGLOBALS'"
+fi
+
+echo "==> Kvantum configurado con tema Silvery como engine por defecto."
+
+
+# ==========================================
+# 5.2 ICONOS SILVERY-DARK-ICONS POR DEFECTO
+# ==========================================
+echo "==> Configurando iconos Silvery-Dark-Icons por defecto..."
+
+ICON_THEME_ID="Silvery-Dark-Icons"
+SILVERY_ICONS_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d \( -iname "*silvery*dark*icon*" -o -iname "*silvery-dark-icons*" \) 2>/dev/null | head -n1 || true)
+
+if [ -n "$SILVERY_ICONS_DIR" ]; then
+    ICON_THEME_ID=$(basename "$SILVERY_ICONS_DIR")
+    echo "==> Carpeta de iconos Silvery detectada: $SILVERY_ICONS_DIR"
+else
+    echo "==> Aviso: no se encontró Silvery-Dark-Icons instalado, se intentará instalar desde AUR..."
+    yay -S silvery-dark-icons-git --noconfirm || echo "==> Aviso: no se pudo instalar silvery-dark-icons-git."
+    SILVERY_ICONS_DIR=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -maxdepth 1 -type d \( -iname "*silvery*dark*icon*" -o -iname "*silvery-dark-icons*" \) 2>/dev/null | head -n1 || true)
+    if [ -n "$SILVERY_ICONS_DIR" ]; then
+        ICON_THEME_ID=$(basename "$SILVERY_ICONS_DIR")
+    fi
+fi
+
+KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[Icons\]" "$KDEGLOBALS"; then
+    if grep -q "^Theme=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$ICON_THEME_ID|" "$KDEGLOBALS"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[Icons\]/a Theme=$ICON_THEME_ID" "$KDEGLOBALS"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[Icons]\nTheme=%s\n' '$ICON_THEME_ID' >> '$KDEGLOBALS'"
+fi
+echo "==> Icon theme $ICON_THEME_ID fijado por defecto."
+
+
+# ==========================================
+# 5.3 TRANSPARENCIA POR DEFECTO EN KONSOLE
 # ==========================================
 echo "==> Configurando transparencia por defecto en Konsole..."
 KONSOLE_DATA_DIR="$USER_HOME/.local/share/konsole"
@@ -244,9 +332,9 @@ TRANSPARENT_SCHEME="$KONSOLE_DATA_DIR/BreezeTransparent.colorscheme"
 if [ -f "$BASE_COLORSCHEME" ]; then
     sudo -u "$REAL_USER" cp "$BASE_COLORSCHEME" "$TRANSPARENT_SCHEME"
 else
+    echo "==> Aviso: no se encontró el color scheme base de Breeze, se crea uno mínimo."
     sudo -u "$REAL_USER" bash -c "printf '[Background]\nColor=35,38,41\n[Foreground]\nColor=252,252,252\n[General]\nDescription=BreezeTransparent\n' > '$TRANSPARENT_SCHEME'"
 fi
-
 if grep -q "^\[General\]" "$TRANSPARENT_SCHEME" && grep -q "^Opacity=" "$TRANSPARENT_SCHEME"; then
     sudo -u "$REAL_USER" sed -i "s|^Opacity=.*|Opacity=0.85|" "$TRANSPARENT_SCHEME"
 elif grep -q "^\[General\]" "$TRANSPARENT_SCHEME"; then
@@ -269,7 +357,9 @@ if [ -f "$KONSOLERC" ] && grep -q "^\[Desktop Entry\]" "$KONSOLERC"; then
 else
     sudo -u "$REAL_USER" bash -c "printf '[Desktop Entry]\nDefaultProfile=Transparent.profile\n' >> '$KONSOLERC'"
 fi
+echo "==> Konsole configurado con transparencia (Opacity=0.85) como perfil por defecto."
 
+# Habilitar el efecto de escritorio Blur, para que la transparencia se vea bien
 KWINRC="$USER_HOME/.config/kwinrc"
 sudo -u "$REAL_USER" touch "$KWINRC"
 if grep -q "^\[Plugins\]" "$KWINRC" 2>/dev/null; then
@@ -284,52 +374,33 @@ fi
 
 
 # ==========================================
-# 5.3 FONDO DE PANTALLA SILVERY CON LOGO KDE
+# 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
 # ==========================================
-echo "==> Configurando fondo Silvery-Wallpaper-With-KDE-Plasma-Logo-2 por defecto..."
+echo "==> Instalando y configurando tema SDDM Silvery-Dark-SDDM-6..."
 
-WALLPAPER_NAME="Silvery-Wallpaper-With-KDE-Plasma-Logo-2"
-PLASMRC="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
-
-sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-
-if [ ! -f "$PLASMRC" ] || ! grep -q "\[Containments\]" "$PLASMRC"; then
-    sudo -u "$REAL_USER" bash -c "cat > '$PLASMRC'" << EOF
-[Containments][1]
-activityId=
-wallpaperplugin=org.kde.image
-
-[Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
-ImageName=$WALLPAPER_NAME
-EOF
-else
-    if grep -q "\[Wallpaper\]\[org.kde.image\]\[General\]" "$PLASMRC"; then
-        sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=file:///usr/share/wallpapers/$WALLPAPER_NAME|" "$PLASMRC"
-        sudo -u "$REAL_USER" sed -i "s|^ImageName=.*|ImageName=$WALLPAPER_NAME|" "$PLASMRC"
+SDDM_TMP=$(mktemp -d)
+if git clone --depth 1 https://github.com/L4ki/Silvery-Plasma-Themes.git "$SDDM_TMP/silvery-themes"; then
+    if [ -d "$SDDM_TMP/silvery-themes/Silvery-SDDM-6" ]; then
+        sudo mkdir -p /usr/share/sddm/themes/silvery-dark
+        sudo cp -r "$SDDM_TMP/silvery-themes/Silvery-SDDM-6/"* /usr/share/sddm/themes/silvery-dark/
+        echo "==> Archivos de tema SDDM Silvery-Dark instalados en /usr/share/sddm/themes/silvery-dark."
     else
-        sudo -u "$REAL_USER" bash -c "cat >> '$PLASMRC'" << EOF
-
-[Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
-ImageName=$WALLPAPER_NAME
-EOF
+        echo "==> Aviso: No se encontró la carpeta Silvery-SDDM-6 dentro del repositorio."
     fi
+else
+    echo "==> Aviso: No se pudo clonar el repositorio Silvery-Plasma-Themes."
 fi
+rm -rf "$SDDM_TMP"
 
-
-# ==========================================
-# 6. CONFIGURACIÓN DE SDDM Y GRUB
-# ==========================================
-echo "==> Configurando Silvery-SDDM-6 en la pantalla de inicio de sesión..."
-
+# Establecer Silvery-Dark como el tema activo en la configuración de SDDM
+echo "==> Configurando /etc/sddm.conf.d/theme.conf.user..."
 sudo mkdir -p /etc/sddm.conf.d
 sudo bash -c 'cat > /etc/sddm.conf.d/theme.conf.user' << EOF
 [Theme]
-Current=Silvery-SDDM-6
+Current=silvery-dark
 EOF
 
-echo "==> Habilitando SDDM..."
+echo "==> Habilitando SDDM como Display Manager..."
 for dm in entrance gdm lightdm; do
     if systemctl is-enabled "$dm" &>/dev/null; then
         echo "==> Deshabilitando $dm..."
@@ -338,12 +409,6 @@ for dm in entrance gdm lightdm; do
 done
 
 sudo systemctl enable sddm
-
-echo "==> Configurando GRUB para detectar otros SO..."
-if [ -f /etc/default/grub ]; then
-    sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
-    sudo grub-mkconfig -o /boot/grub/grub.cfg
-fi
 
 
 # ==========================================
@@ -368,7 +433,6 @@ else
 fi
 
 
-
 # ==========================================
 # 7. LIMPIEZA Y REINICIO
 # ==========================================
@@ -376,12 +440,13 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: SDDM (Silvery-SDDM-6)"
+echo " Display manager configurado: SDDM (tema Silvery-Dark)"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema Global: Silvery-Dark-Global-6"
-echo " Pantalla de bienvenida: Silvery-Dark-Global-6"
-echo " Konsole: transparencia por defecto (Opacity=0.85)"
-echo " Fondo de pantalla: Silvery-Wallpaper-With-KDE-Plasma-Logo-2"
+echo " Tema Global: Silvery-Dark-Global-6
+ Kvantum: tema Silvery (para apps Qt)
+ Icon theme: Silvery-Dark-Icons
+ Konsole: transparencia por defecto (Opacity=0.85)
+ Fondo de pantalla: incluido en Silvery-Dark-Global-6"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
 S        I    NN  N  E      R   R  G   G    I    A   A
