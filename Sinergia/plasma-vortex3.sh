@@ -10,46 +10,6 @@ trap 'echo "==> ERROR: el script falló en la línea $LINENO (comando: $BASH_COM
 REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo "~$REAL_USER")
 
-# ==========================================
-# 0. UTILIDAD: DESCARGA DE ELEMENTOS DE KDE STORE (API OCS)
-# ==========================================
-# Dado el ID numérico de un elemento de KDE Store (el que aparece en la URL,
-# ej. store.kde.org/p/1422319 -> 1422319), consulta la API pública OCS y
-# descarga el archivo del paquete. Como el link de descarga real se pide en
-# el momento (y no se guarda hardcodeado), nunca queda vencido.
-fetch_kde_store_file() {
-    local content_id="$1"
-    local dest_dir="$2"
-    local api_url="https://api.kde-look.org/ocs/v1/content/data/${content_id}"
-    local xml
-    xml=$(curl -fsSL "$api_url") || { echo "==> Aviso: no se pudo consultar KDE Store (id $content_id)." >&2; return 1; }
-
-    local dl_url dl_name
-    dl_url=$(echo "$xml" | grep -oP '(?<=<downloadlink1>)[^<]+')
-    dl_name=$(echo "$xml" | grep -oP '(?<=<downloadname1>)[^<]+')
-
-    if [ -z "$dl_url" ]; then
-        echo "==> Aviso: KDE Store no devolvió un link de descarga para el id $content_id." >&2
-        return 1
-    fi
-
-    curl -fsSL "$dl_url" -o "$dest_dir/$dl_name" || { echo "==> Aviso: falló la descarga de $dl_name." >&2; return 1; }
-    echo "$dest_dir/$dl_name"
-}
-
-# Descomprime un archivo (tar.gz/tar.xz/tar.bz2/zip) detectando el formato por extensión
-extract_archive() {
-    local archive="$1"
-    local dest="$2"
-    mkdir -p "$dest"
-    case "$archive" in
-        *.tar.gz|*.tgz) tar -xzf "$archive" -C "$dest" ;;
-        *.tar.xz)       tar -xJf "$archive" -C "$dest" ;;
-        *.tar.bz2)      tar -xjf "$archive" -C "$dest" ;;
-        *.zip)          unzip -q "$archive" -d "$dest" ;;
-        *) echo "==> Aviso: formato de archivo no reconocido: $archive" >&2; return 1 ;;
-    esac
-}
 
 # ==========================================
 # 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
@@ -478,47 +438,6 @@ fi
 
 echo "==> Fondo 'Nexus' configurado por defecto."
 
-# ==========================================
-# 5.5 PANTALLA DE BIENVENIDA (SPLASH DE PLASMA): ARCH SIMPLE BLUE KDE 6
-# ==========================================
-echo "==> Instalando el splash 'Arch Simple Blue KDE 6' desde KDE Store..."
-
-SPLASH_TMP=$(mktemp -d)
-SPLASH_ARCHIVE=$(fetch_kde_store_file "2136517" "$SPLASH_TMP") || true
-
-if [ -n "${SPLASH_ARCHIVE:-}" ] && [ -f "$SPLASH_ARCHIVE" ]; then
-    SPLASH_EXTRACT="$SPLASH_TMP/extracted"
-    extract_archive "$SPLASH_ARCHIVE" "$SPLASH_EXTRACT" || true
-
-    SPLASH_META=$(find "$SPLASH_EXTRACT" -maxdepth 3 -iname "metadata.desktop" | head -n1 || true)
-    if [ -n "$SPLASH_META" ]; then
-        SPLASH_SRC_DIR=$(dirname "$SPLASH_META")
-        SPLASH_ID=$(grep -oP '(?<=X-KDE-PluginInfo-Name=).+' "$SPLASH_META" | head -n1 || true)
-        SPLASH_ID=${SPLASH_ID:-arch-simple-blue-kde-6}
-
-        sudo mkdir -p "/usr/share/plasma/splash/$SPLASH_ID"
-        sudo cp -r "$SPLASH_SRC_DIR"/* "/usr/share/plasma/splash/$SPLASH_ID/"
-        echo "==> Splash '$SPLASH_ID' instalado en /usr/share/plasma/splash/$SPLASH_ID"
-
-        KSPLASHRC="$USER_HOME/.config/ksplashrc"
-        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-        if [ -f "$KSPLASHRC" ] && grep -q "^\[KSplash\]" "$KSPLASHRC"; then
-            if grep -q "^Theme=" "$KSPLASHRC"; then
-                sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$SPLASH_ID|" "$KSPLASHRC"
-            else
-                sudo -u "$REAL_USER" sed -i "/^\[KSplash\]/a Theme=$SPLASH_ID" "$KSPLASHRC"
-            fi
-        else
-            sudo -u "$REAL_USER" bash -c "printf '\n[KSplash]\nTheme=%s\n' '$SPLASH_ID' >> '$KSPLASHRC'"
-        fi
-        echo "==> '$SPLASH_ID' fijado como pantalla de bienvenida por defecto."
-    else
-        echo "==> Aviso: no se encontró metadata.desktop en el paquete descargado; se omite la instalación del splash."
-    fi
-else
-    echo "==> Aviso: no se pudo descargar 'Arch Simple Blue KDE 6' automáticamente. Podés instalarlo manualmente después desde KDE Store (id 2136517)."
-fi
-rm -rf "$SPLASH_TMP"
 
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
