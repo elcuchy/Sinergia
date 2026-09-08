@@ -460,71 +460,91 @@ fi
 # ==========================================
 # 5.4 FONDO DE PANTALLA VORTEX-WALLPAPER (descargado en vivo desde la KDE Store)
 # ==========================================
-echo "==> Descargando el fondo de pantalla Vortex-Wallpaper desde la KDE Store..."
+echo "==> Descargando el fondo de pantalla Vortex-Wallpaper desde la KDE Store (id 1493413)..."
 WALLPAPER_TMP=$(mktemp -d)
 WALLPAPER_OK=0
 
-echo "==> Intentando con content id 1493412..."
-if fetch_kde_store_file 1493412 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
+if fetch_kde_store_file 1493413 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
     WALLPAPER_OK=1
-else
-    echo "==> Intentando con content id 1493413 (respaldo)..."
-    if fetch_kde_store_file 1493413 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
-        WALLPAPER_OK=1
-    fi
 fi
 
 sudo mkdir -p /usr/share/wallpapers
 
-WALLPAPER_FILENAME=""
+WALLPAPER_PKG_NAME="Vortex-Wallpaper"
+WALLPAPER_IMG_INSIDE=""
 if [ "$WALLPAPER_OK" = "1" ]; then
     echo "==> Tipo de archivo descargado: $(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")"
     # El archivo descargado puede ser directamente la imagen (PNG o JPEG), o un
     # paquete comprimido que contiene la imagen adentro. Se detectan todos los casos.
     FILETYPE=$(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")
-    if echo "$FILETYPE" | grep -qi "PNG image"; then
-        WALLPAPER_FILENAME="Vortex-Wallpaper.png"
-        sudo cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" "/usr/share/wallpapers/$WALLPAPER_FILENAME"
-    elif echo "$FILETYPE" | grep -qi "JPEG image"; then
-        WALLPAPER_FILENAME="Vortex-Wallpaper.jpg"
-        sudo cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" "/usr/share/wallpapers/$WALLPAPER_FILENAME"
+    if echo "$FILETYPE" | grep -qiE "PNG image|JPEG image"; then
+        WALLPAPER_EXT="png"
+        echo "$FILETYPE" | grep -qi "JPEG image" && WALLPAPER_EXT="jpg"
+        WALLPAPER_IMG_INSIDE="$WALLPAPER_TMP/vortex-wallpaper.$WALLPAPER_EXT"
+        cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_IMG_INSIDE"
     else
         mkdir -p "$WALLPAPER_TMP/extracted"
         extract_tar_auto "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_TMP/extracted" 2>&1 || true
         echo "==> Contenido extraído del wallpaper (recursivo): $(find "$WALLPAPER_TMP/extracted" -type f 2>/dev/null | tr '\n' ' ')"
-        FOUND_IMG=$(find "$WALLPAPER_TMP/extracted" -iname "Vortex-Wallpaper*" \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null | head -n1 || true)
-        [ -n "$FOUND_IMG" ] || FOUND_IMG=$(find "$WALLPAPER_TMP/extracted" \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null | sort -rV | head -n1 || true)
-        if [ -n "$FOUND_IMG" ]; then
-            WALLPAPER_FILENAME="Vortex-Wallpaper.${FOUND_IMG##*.}"
-            sudo cp "$FOUND_IMG" "/usr/share/wallpapers/$WALLPAPER_FILENAME"
+        # Si ya viene empaquetado como carpeta con metadata.json/desktop, usar esa carpeta directamente
+        EXISTING_PKG=$(find "$WALLPAPER_TMP/extracted" -maxdepth 2 -type f \( -name "metadata.json" -o -name "metadata.desktop" \) 2>/dev/null | head -n1 | xargs -r dirname || true)
+        if [ -n "$EXISTING_PKG" ]; then
+            WALLPAPER_PKG_NAME=$(basename "$EXISTING_PKG")
+            sudo mkdir -p /usr/share/wallpapers
+            sudo rm -rf "/usr/share/wallpapers/$WALLPAPER_PKG_NAME"
+            sudo cp -r "$EXISTING_PKG" "/usr/share/wallpapers/$WALLPAPER_PKG_NAME"
+            echo "==> El paquete ya venía armado como carpeta, se copió tal cual: $WALLPAPER_PKG_NAME"
         else
-            WALLPAPER_OK=0
+            FOUND_IMG=$(find "$WALLPAPER_TMP/extracted" \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null | sort -rV | head -n1 || true)
+            [ -n "$FOUND_IMG" ] && WALLPAPER_IMG_INSIDE="$FOUND_IMG"
         fi
     fi
+fi
+
+# Si tenemos una imagen suelta (no un paquete ya armado), construir el paquete
+# con el mismo formato que usa el resto de los wallpapers del sistema:
+# <nombre>/contents/images/<archivo> + metadata.json
+if [ -n "$WALLPAPER_IMG_INSIDE" ] && [ -f "$WALLPAPER_IMG_INSIDE" ]; then
+    IMG_BASENAME=$(basename "$WALLPAPER_IMG_INSIDE")
+    PKG_DIR="/usr/share/wallpapers/$WALLPAPER_PKG_NAME"
+    sudo mkdir -p "$PKG_DIR/contents/images"
+    sudo cp "$WALLPAPER_IMG_INSIDE" "$PKG_DIR/contents/images/$IMG_BASENAME"
+    sudo bash -c "cat > '$PKG_DIR/metadata.json'" << EOF
+{
+    "KPackageStructure": "Plasma/Wallpaper",
+    "KPlugin": {
+        "Id": "$WALLPAPER_PKG_NAME",
+        "Name": "$WALLPAPER_PKG_NAME"
+    }
+}
+EOF
+    echo "==> Paquete de wallpaper armado en $PKG_DIR"
+    WALLPAPER_OK=1
+elif [ ! -d "/usr/share/wallpapers/$WALLPAPER_PKG_NAME" ]; then
+    WALLPAPER_OK=0
 fi
 
 # Si el Tema Global se instaló, ajustar su contents/defaults para que el
-# "Image=" apunte exactamente al nombre de archivo que terminamos usando
-if [ "$WALLPAPER_OK" = "1" ] && [ -n "$WALLPAPER_FILENAME" ] && [ -n "${GLOBALTHEME_ID:-}" ]; then
+# "Image=" apunte exactamente al nombre del paquete que terminamos usando
+if [ "$WALLPAPER_OK" = "1" ] && [ -n "${GLOBALTHEME_ID:-}" ]; then
     THEME_DEFAULTS="$USER_HOME/.local/share/plasma/look-and-feel/$GLOBALTHEME_ID/contents/defaults"
-    if [ -f "$THEME_DEFAULTS" ]; then
-        WALLPAPER_ID_NOEXT="${WALLPAPER_FILENAME%.*}"
-        if grep -q "^Image=" "$THEME_DEFAULTS"; then
-            sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=$WALLPAPER_ID_NOEXT|" "$THEME_DEFAULTS"
-        fi
+    if [ -f "$THEME_DEFAULTS" ] && grep -q "^Image=" "$THEME_DEFAULTS"; then
+        sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=$WALLPAPER_PKG_NAME|" "$THEME_DEFAULTS"
+        echo "==> contents/defaults del Tema Global actualizado: Image=$WALLPAPER_PKG_NAME"
     fi
 fi
 
-if [ "$WALLPAPER_OK" = "1" ] && [ -n "$WALLPAPER_FILENAME" ] && [ -f "/usr/share/wallpapers/$WALLPAPER_FILENAME" ]; then
-    echo "==> $WALLPAPER_FILENAME instalado en /usr/share/wallpapers/"
+if [ "$WALLPAPER_OK" = "1" ] && [ -d "/usr/share/wallpapers/$WALLPAPER_PKG_NAME" ]; then
+    echo "==> Wallpaper $WALLPAPER_PKG_NAME instalado en /usr/share/wallpapers/"
+    FIRST_IMG=$(find "/usr/share/wallpapers/$WALLPAPER_PKG_NAME" -type f \( -iname "*.png" -o -iname "*.jpg" \) 2>/dev/null | head -n1 || true)
 
-    if command -v plasma-apply-wallpaperimage &>/dev/null; then
+    if [ -n "$FIRST_IMG" ] && command -v plasma-apply-wallpaperimage &>/dev/null; then
         sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-            plasma-apply-wallpaperimage "/usr/share/wallpapers/$WALLPAPER_FILENAME" || \
+            plasma-apply-wallpaperimage "$FIRST_IMG" || \
             echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión vía Vortex-Global-6."
     fi
 else
-    echo "==> Aviso: no se pudo obtener Vortex-Wallpaper.png de la KDE Store."
+    echo "==> Aviso: no se pudo obtener el wallpaper de Vortex de la KDE Store."
 fi
 rm -rf "$WALLPAPER_TMP"
 
