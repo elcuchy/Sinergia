@@ -285,6 +285,26 @@ if [ -n "$GLOBALTHEME_ID" ] && [ -d "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID" ]; then
     echo "==> $GLOBALTHEME_ID fijado como Tema Global por defecto (incluye su propio splash screen embebido)."
 fi
 
+# --- Decoración de ventanas: Breeze ---
+# Vortex-Global-6 referencia su propia decoración (Vortex-Aurorae-6), que no se instaló
+# por separado, así que sin esto KWin queda sin ninguna decoración asignada.
+echo "==> Fijando Breeze como decoración de ventanas por defecto..."
+KWINRC="$USER_HOME/.config/kwinrc"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+sudo -u "$REAL_USER" touch "$KWINRC"
+if command -v kwriteconfig6 &>/dev/null; then
+    KWRITECFG=kwriteconfig6
+else
+    KWRITECFG=kwriteconfig5
+fi
+if command -v "$KWRITECFG" &>/dev/null; then
+    sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "library" "org.kde.breeze"
+    sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "theme" "Breeze"
+    echo "==> Decoración de ventanas Breeze fijada por defecto."
+else
+    echo "==> Aviso: no se encontró kwriteconfig6/5, no se pudo fijar la decoración de ventanas."
+fi
+
 # ==========================================
 # 5.2 ICONOS VORTEX-DARK-ICONS (descargado en vivo) + ÍCONO DE LANZADOR ARCH LINUX
 # ==========================================
@@ -456,32 +476,51 @@ fi
 
 sudo mkdir -p /usr/share/wallpapers
 
+WALLPAPER_FILENAME=""
 if [ "$WALLPAPER_OK" = "1" ]; then
     echo "==> Tipo de archivo descargado: $(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")"
-    # El archivo descargado puede ser directamente la imagen, o un paquete
-    # comprimido que contiene "Vortex-Wallpaper.png" adentro. Se detectan ambos casos.
-    if file "$WALLPAPER_TMP/vortex-wallpaper.pkg" | grep -qi "PNG image"; then
-        sudo cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" /usr/share/wallpapers/Vortex-Wallpaper.png
+    # El archivo descargado puede ser directamente la imagen (PNG o JPEG), o un
+    # paquete comprimido que contiene la imagen adentro. Se detectan todos los casos.
+    FILETYPE=$(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")
+    if echo "$FILETYPE" | grep -qi "PNG image"; then
+        WALLPAPER_FILENAME="Vortex-Wallpaper.png"
+        sudo cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" "/usr/share/wallpapers/$WALLPAPER_FILENAME"
+    elif echo "$FILETYPE" | grep -qi "JPEG image"; then
+        WALLPAPER_FILENAME="Vortex-Wallpaper.jpg"
+        sudo cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" "/usr/share/wallpapers/$WALLPAPER_FILENAME"
     else
         mkdir -p "$WALLPAPER_TMP/extracted"
         extract_tar_auto "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_TMP/extracted" 2>&1 || true
         echo "==> Contenido extraído del wallpaper (recursivo): $(find "$WALLPAPER_TMP/extracted" -type f 2>/dev/null | tr '\n' ' ')"
-        FOUND_PNG=$(find "$WALLPAPER_TMP/extracted" -iname "Vortex-Wallpaper*.png" 2>/dev/null | head -n1 || true)
-        [ -n "$FOUND_PNG" ] || FOUND_PNG=$(find "$WALLPAPER_TMP/extracted" \( -iname "*.png" -o -iname "*.jpg" \) 2>/dev/null | head -n1 || true)
-        if [ -n "$FOUND_PNG" ]; then
-            sudo cp "$FOUND_PNG" /usr/share/wallpapers/Vortex-Wallpaper.png
+        FOUND_IMG=$(find "$WALLPAPER_TMP/extracted" -iname "Vortex-Wallpaper*" \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null | head -n1 || true)
+        [ -n "$FOUND_IMG" ] || FOUND_IMG=$(find "$WALLPAPER_TMP/extracted" \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null | sort -rV | head -n1 || true)
+        if [ -n "$FOUND_IMG" ]; then
+            WALLPAPER_FILENAME="Vortex-Wallpaper.${FOUND_IMG##*.}"
+            sudo cp "$FOUND_IMG" "/usr/share/wallpapers/$WALLPAPER_FILENAME"
         else
             WALLPAPER_OK=0
         fi
     fi
 fi
 
-if [ "$WALLPAPER_OK" = "1" ] && [ -f /usr/share/wallpapers/Vortex-Wallpaper.png ]; then
-    echo "==> Vortex-Wallpaper.png instalado en /usr/share/wallpapers/"
+# Si el Tema Global se instaló, ajustar su contents/defaults para que el
+# "Image=" apunte exactamente al nombre de archivo que terminamos usando
+if [ "$WALLPAPER_OK" = "1" ] && [ -n "$WALLPAPER_FILENAME" ] && [ -n "${GLOBALTHEME_ID:-}" ]; then
+    THEME_DEFAULTS="$USER_HOME/.local/share/plasma/look-and-feel/$GLOBALTHEME_ID/contents/defaults"
+    if [ -f "$THEME_DEFAULTS" ]; then
+        WALLPAPER_ID_NOEXT="${WALLPAPER_FILENAME%.*}"
+        if grep -q "^Image=" "$THEME_DEFAULTS"; then
+            sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=$WALLPAPER_ID_NOEXT|" "$THEME_DEFAULTS"
+        fi
+    fi
+fi
+
+if [ "$WALLPAPER_OK" = "1" ] && [ -n "$WALLPAPER_FILENAME" ] && [ -f "/usr/share/wallpapers/$WALLPAPER_FILENAME" ]; then
+    echo "==> $WALLPAPER_FILENAME instalado en /usr/share/wallpapers/"
 
     if command -v plasma-apply-wallpaperimage &>/dev/null; then
         sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-            plasma-apply-wallpaperimage "/usr/share/wallpapers/Vortex-Wallpaper.png" || \
+            plasma-apply-wallpaperimage "/usr/share/wallpapers/$WALLPAPER_FILENAME" || \
             echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión vía Vortex-Global-6."
     fi
 else
