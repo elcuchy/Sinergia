@@ -479,12 +479,12 @@ fi
 echo "==> Fondo 'Nexus' configurado por defecto."
 
 # ==========================================
-# 5.5 PANTALLA DE BIENVENIDA (SPLASH DE PLASMA): CRISTAL BAR ARCHLINUX
+# 5.5 PANTALLA DE BIENVENIDA (SPLASH DE PLASMA): ARCH SIMPLE BLUE KDE 6
 # ==========================================
-echo "==> Instalando el splash 'Cristal Bar Archlinux' desde KDE Store..."
+echo "==> Instalando el splash 'Arch Simple Blue KDE 6' desde KDE Store..."
 
 SPLASH_TMP=$(mktemp -d)
-SPLASH_ARCHIVE=$(fetch_kde_store_file "1422319" "$SPLASH_TMP") || true
+SPLASH_ARCHIVE=$(fetch_kde_store_file "2136517" "$SPLASH_TMP") || true
 
 if [ -n "${SPLASH_ARCHIVE:-}" ] && [ -f "$SPLASH_ARCHIVE" ]; then
     SPLASH_EXTRACT="$SPLASH_TMP/extracted"
@@ -494,7 +494,7 @@ if [ -n "${SPLASH_ARCHIVE:-}" ] && [ -f "$SPLASH_ARCHIVE" ]; then
     if [ -n "$SPLASH_META" ]; then
         SPLASH_SRC_DIR=$(dirname "$SPLASH_META")
         SPLASH_ID=$(grep -oP '(?<=X-KDE-PluginInfo-Name=).+' "$SPLASH_META" | head -n1 || true)
-        SPLASH_ID=${SPLASH_ID:-cristal-bar-archlinux}
+        SPLASH_ID=${SPLASH_ID:-arch-simple-blue-kde-6}
 
         sudo mkdir -p "/usr/share/plasma/splash/$SPLASH_ID"
         sudo cp -r "$SPLASH_SRC_DIR"/* "/usr/share/plasma/splash/$SPLASH_ID/"
@@ -516,7 +516,7 @@ if [ -n "${SPLASH_ARCHIVE:-}" ] && [ -f "$SPLASH_ARCHIVE" ]; then
         echo "==> Aviso: no se encontró metadata.desktop en el paquete descargado; se omite la instalación del splash."
     fi
 else
-    echo "==> Aviso: no se pudo descargar 'Cristal Bar Archlinux' automáticamente. Podés instalarlo manualmente después desde KDE Store (id 1422319)."
+    echo "==> Aviso: no se pudo descargar 'Arch Simple Blue KDE 6' automáticamente. Podés instalarlo manualmente después desde KDE Store (id 2136517)."
 fi
 rm -rf "$SPLASH_TMP"
 
@@ -573,7 +573,7 @@ echo " Tema Global: Breeze Dark"
 echo " Icon theme: Vortex-Dark-Icons con ícono de lanzador Arch Linux"
 echo " Konsole: transparencia por defecto (Opacity=0.85)"
 echo " Fondo de pantalla: Nexus"
-echo " Splash de Plasma: Cristal Bar Archlinux"
+echo " Splash de Plasma: Arch Simple Blue KDE 6"
 echo " Tema SDDM: por defecto (sin personalizar)"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
