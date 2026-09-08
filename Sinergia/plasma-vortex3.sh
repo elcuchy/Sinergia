@@ -523,48 +523,9 @@ rm -rf "$SPLASH_TMP"
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
 # ==========================================
-echo "==> Instalando y configurando el tema Earth Night para SDDM (desde KDE Store)..."
-
-SDDM_TMP=$(mktemp -d)
-SDDM_ARCHIVE=$(fetch_kde_store_file "1225550" "$SDDM_TMP") || true
-
-SDDM_THEME_ID="earth-night"
-
-if [ -n "${SDDM_ARCHIVE:-}" ] && [ -f "$SDDM_ARCHIVE" ]; then
-    SDDM_EXTRACT="$SDDM_TMP/extracted"
-    extract_archive "$SDDM_ARCHIVE" "$SDDM_EXTRACT" || true
-
-    SDDM_MAIN_QML=$(find "$SDDM_EXTRACT" -maxdepth 4 -iname "Main.qml" | head -n1 || true)
-    if [ -n "$SDDM_MAIN_QML" ]; then
-        SDDM_SRC_DIR=$(dirname "$SDDM_MAIN_QML")
-        SDDM_META=$(find "$SDDM_SRC_DIR" -maxdepth 1 -iname "metadata.desktop" | head -n1 || true)
-        if [ -n "$SDDM_META" ]; then
-            META_ID=$(grep -oP '(?<=^Theme-Id=).+' "$SDDM_META" | head -n1 || true)
-            [ -n "$META_ID" ] && SDDM_THEME_ID="$META_ID"
-        fi
-        sudo mkdir -p "/usr/share/sddm/themes/$SDDM_THEME_ID"
-        sudo cp -r "$SDDM_SRC_DIR"/* "/usr/share/sddm/themes/$SDDM_THEME_ID/"
-        echo "==> Tema SDDM '$SDDM_THEME_ID' instalado en /usr/share/sddm/themes/$SDDM_THEME_ID"
-    else
-        echo "==> Aviso: no se encontró Main.qml en el paquete descargado; se omite la instalación del tema SDDM."
-        SDDM_THEME_ID=""
-    fi
-else
-    echo "==> Aviso: no se pudo descargar el tema SDDM 'Earth Night' automáticamente (id 1225550)."
-    SDDM_THEME_ID=""
-fi
-rm -rf "$SDDM_TMP"
-
-if [ -n "$SDDM_THEME_ID" ]; then
-    echo "==> Configurando /etc/sddm.conf.d/theme.conf.user..."
-    sudo mkdir -p /etc/sddm.conf.d
-    sudo bash -c "cat > /etc/sddm.conf.d/theme.conf.user" << EOF
-[Theme]
-Current=$SDDM_THEME_ID
-EOF
-else
-    echo "==> Aviso: no se fijó ningún tema de SDDM porque la descarga o la detección del paquete falló."
-fi
+# Se deja el tema por defecto que trae SDDM (breeze), sin aplicar ningún tema
+# personalizado ni escribir /etc/sddm.conf.d/theme.conf.user.
+echo "==> SDDM se deja con su tema por defecto (sin personalizar)."
 
 echo "==> Habilitando SDDM como Display Manager..."
 # Deshabilitar otros DMs si están activos para evitar conflictos
@@ -613,7 +574,7 @@ echo " Icon theme: Vortex-Dark-Icons con ícono de lanzador Arch Linux"
 echo " Konsole: transparencia por defecto (Opacity=0.85)"
 echo " Fondo de pantalla: Nexus"
 echo " Splash de Plasma: Cristal Bar Archlinux"
-echo " Tema SDDM: Earth Night"
+echo " Tema SDDM: por defecto (sin personalizar)"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
 S        I    NN  N  E      R   R  G   G    I    A   A
