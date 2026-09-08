@@ -10,51 +10,45 @@ trap 'echo "==> ERROR: el script falló en la línea $LINENO (comando: $BASH_COM
 REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo "~$REAL_USER")
 
-# Función helper: descarga un archivo desde la KDE Store usando su API pública (OCS).
-# Recibe el ID numérico de contenido (visible en la URL store.kde.org/p/<ID>) y la
-# ruta de destino. El link real de descarga expira, así que se consulta en el momento.
+# ==========================================
+# 0. UTILIDAD: DESCARGA DE ELEMENTOS DE KDE STORE (API OCS)
+# ==========================================
+# Dado el ID numérico de un elemento de KDE Store (el que aparece en la URL,
+# ej. store.kde.org/p/1422319 -> 1422319), consulta la API pública OCS y
+# descarga el archivo del paquete. Como el link de descarga real se pide en
+# el momento (y no se guarda hardcodeado), nunca queda vencido.
 fetch_kde_store_file() {
     local content_id="$1"
-    local outfile="$2"
-    local api_xml url
+    local dest_dir="$2"
+    local api_url="https://api.kde-look.org/ocs/v1/content/data/${content_id}"
+    local xml
+    xml=$(curl -fsSL "$api_url") || { echo "==> Aviso: no se pudo consultar KDE Store (id $content_id)." >&2; return 1; }
 
-    api_xml=$(curl -s "https://api.kde-look.org/ocs/v1/content/data/$content_id")
-    if [ -z "$api_xml" ]; then
-        api_xml=$(curl -s "https://api.pling.com/ocs/v1/content/data/$content_id")
-    fi
+    local dl_url dl_name
+    dl_url=$(echo "$xml" | grep -oP '(?<=<downloadlink1>)[^<]+')
+    dl_name=$(echo "$xml" | grep -oP '(?<=<downloadname1>)[^<]+')
 
-    url=$(echo "$api_xml" | grep -oP '(?<=<downloadlink1>)[^<]+' | head -n1)
-    [ -n "$url" ] || url=$(echo "$api_xml" | grep -oP '(?<=<downloadlink>)[^<]+' | head -n1)
-    url=$(echo "$url" | sed 's/&amp;/\&/g')
-
-    if [ -z "$url" ]; then
-        echo "==> Aviso: no se pudo obtener el link de descarga para el contenido $content_id de la KDE Store."
-        echo "==> Respuesta cruda de la API (primeros 500 caracteres) para diagnosticar:"
-        echo "${api_xml:0:500}"
+    if [ -z "$dl_url" ]; then
+        echo "==> Aviso: KDE Store no devolvió un link de descarga para el id $content_id." >&2
         return 1
     fi
 
-    echo "==> Link de descarga obtenido para $content_id: $url"
-    if curl -sL -o "$outfile" "$url"; then
-        echo "==> Descargado desde la KDE Store (id $content_id): $outfile ($(du -h "$outfile" 2>/dev/null | cut -f1))"
-        return 0
-    else
-        echo "==> Aviso: falló la descarga desde $url"
-        return 1
-    fi
+    curl -fsSL "$dl_url" -o "$dest_dir/$dl_name" || { echo "==> Aviso: falló la descarga de $dl_name." >&2; return 1; }
+    echo "$dest_dir/$dl_name"
 }
 
-# Función helper: extrae un tar.gz o tar.xz detectando el formato automáticamente,
-# ya que la KDE Store no siempre expone la extensión real en el nombre del link firmado.
-extract_tar_auto() {
-    local infile="$1" destdir="$2"
-    if tar -tJf "$infile" &>/dev/null; then
-        tar -xJf "$infile" -C "$destdir"
-    elif tar -tzf "$infile" &>/dev/null; then
-        tar -xzf "$infile" -C "$destdir"
-    else
-        tar -xf "$infile" -C "$destdir"
-    fi
+# Descomprime un archivo (tar.gz/tar.xz/tar.bz2/zip) detectando el formato por extensión
+extract_archive() {
+    local archive="$1"
+    local dest="$2"
+    mkdir -p "$dest"
+    case "$archive" in
+        *.tar.gz|*.tgz) tar -xzf "$archive" -C "$dest" ;;
+        *.tar.xz)       tar -xJf "$archive" -C "$dest" ;;
+        *.tar.bz2)      tar -xjf "$archive" -C "$dest" ;;
+        *.zip)          unzip -q "$archive" -d "$dest" ;;
+        *) echo "==> Aviso: formato de archivo no reconocido: $archive" >&2; return 1 ;;
+    esac
 }
 
 # ==========================================
@@ -150,6 +144,7 @@ sudo pacman -S --noconfirm --needed \
   vlc \
   unrar \
   unarchiver \
+  unzip \
   p7zip \
   firefox \
   firefox-i18n-es-ar \
@@ -224,122 +219,79 @@ echo "==> Instalando paquetes adicionales..."
 yay -S stacer-bin sinergia-dd-burner iptvnator-bin yamis-icon-theme-git fetch-git --noconfirm
 
 # ==========================================
-# 5.1 TEMA GLOBAL VORTEX-GLOBAL-6 (descargado en vivo desde la KDE Store)
+# 5.1 TEMA GLOBAL BREEZE DARK POR DEFECTO
 # ==========================================
-echo "==> Descargando e instalando el Tema Global Vortex-Global-6 desde la KDE Store..."
+echo "==> Fijando Breeze Dark como Tema Global por defecto..."
+BREEZEDARK_ID="org.kde.breezedark.desktop"
 USER_UID=$(id -u "$REAL_USER")
 RUNTIME_DIR="/run/user/$USER_UID"
 if [ ! -d "$RUNTIME_DIR" ]; then
     RUNTIME_DIR=$(sudo -u "$REAL_USER" mktemp -d)
 fi
 
-GLOBALTHEME_ID=""
-VORTEX_TMP=$(sudo -u "$REAL_USER" mktemp -d)
-LOOKANDFEEL_DIR="$USER_HOME/.local/share/plasma/look-and-feel"
-
-if fetch_kde_store_file 2148697 "$VORTEX_TMP/Vortex-Global-6.pkg"; then
-    echo "==> Tipo de archivo descargado: $(file -b "$VORTEX_TMP/Vortex-Global-6.pkg")"
-    sudo -u "$REAL_USER" mkdir -p "$LOOKANDFEEL_DIR" "$VORTEX_TMP/extracted"
-    if sudo -u "$REAL_USER" bash -c "$(declare -f extract_tar_auto); extract_tar_auto '$VORTEX_TMP/Vortex-Global-6.pkg' '$VORTEX_TMP/extracted'"; then
-        echo "==> Contenido extraído (nivel superior): $(ls -1 "$VORTEX_TMP/extracted" | tr '\n' ' ')"
-        # Buscar la carpeta real del look-and-feel (identificada por tener metadata.desktop o metadata.json)
-        DETECTED_DIR=$(find "$VORTEX_TMP/extracted" -maxdepth 2 -type f \( -name "metadata.desktop" -o -name "metadata.json" \) 2>/dev/null | head -n1 | xargs -r dirname || true)
-        if [ -n "$DETECTED_DIR" ]; then
-            GLOBALTHEME_ID=$(basename "$DETECTED_DIR")
-            sudo -u "$REAL_USER" rm -rf "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID"
-            sudo -u "$REAL_USER" cp -r "$DETECTED_DIR" "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID"
-            echo "==> Tema Global instalado como: $GLOBALTHEME_ID"
-        else
-            echo "==> Aviso: no se encontró ningún metadata.desktop/json dentro del paquete extraído."
-        fi
-    else
-        echo "==> Aviso: no se pudo extraer el paquete descargado de Vortex-Global-6."
-    fi
-else
-    echo "==> Aviso: no se pudo descargar Vortex-Global-6 de la KDE Store, se mantiene el tema global anterior."
-fi
-rm -rf "$VORTEX_TMP"
-
-if [ -n "$GLOBALTHEME_ID" ] && [ -d "$LOOKANDFEEL_DIR/$GLOBALTHEME_ID" ]; then
-    if command -v plasma-apply-lookandfeel &>/dev/null; then
-        echo "==> Ejecutando plasma-apply-lookandfeel -a $GLOBALTHEME_ID (modo offscreen)..."
-        if sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-            plasma-apply-lookandfeel -a "$GLOBALTHEME_ID"; then
-            echo "==> plasma-apply-lookandfeel terminó sin errores."
-        else
-            echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
-        fi
-    fi
-
-    KDEGLOBALS="$USER_HOME/.config/kdeglobals"
-    sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-    if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
-        if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
-            sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$GLOBALTHEME_ID|" "$KDEGLOBALS"
-        else
-            sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$GLOBALTHEME_ID" "$KDEGLOBALS"
-        fi
-    else
-        sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$GLOBALTHEME_ID' >> '$KDEGLOBALS'"
-    fi
-    echo "==> $GLOBALTHEME_ID fijado como Tema Global por defecto (incluye su propio splash screen embebido)."
-fi
-
-# --- Decoración de ventanas: Breeze ---
-# Vortex-Global-6 referencia su propia decoración (Vortex-Aurorae-6), que no se instaló
-# por separado, así que sin esto KWin queda sin ninguna decoración asignada.
-echo "==> Fijando Breeze como decoración de ventanas por defecto..."
-KWINRC="$USER_HOME/.config/kwinrc"
 sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
-sudo -u "$REAL_USER" touch "$KWINRC"
-if command -v kwriteconfig6 &>/dev/null; then
-    KWRITECFG=kwriteconfig6
+if command -v plasma-apply-lookandfeel &>/dev/null; then
+    sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+        plasma-apply-lookandfeel -a "$BREEZEDARK_ID" || \
+        echo "==> Aviso: plasma-apply-lookandfeel devolvió un error, se usará el respaldo directo sobre kdeglobals."
 else
-    KWRITECFG=kwriteconfig5
-fi
-if command -v "$KWRITECFG" &>/dev/null; then
-    sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "library" "org.kde.breeze"
-    sudo -u "$REAL_USER" "$KWRITECFG" --file "$KWINRC" --group "org.kde.kdecoration2" --key "theme" "Breeze"
-    echo "==> Decoración de ventanas Breeze fijada por defecto."
-else
-    echo "==> Aviso: no se encontró kwriteconfig6/5, no se pudo fijar la decoración de ventanas."
+    echo "==> Aviso: plasma-apply-lookandfeel no está disponible, se usará el respaldo directo sobre kdeglobals."
 fi
 
+KDEGLOBALS="$USER_HOME/.config/kdeglobals"
+if [ -f "$KDEGLOBALS" ] && grep -q "^\[KDE\]" "$KDEGLOBALS"; then
+    if grep -q "^LookAndFeelPackage=" "$KDEGLOBALS"; then
+        sudo -u "$REAL_USER" sed -i "s|^LookAndFeelPackage=.*|LookAndFeelPackage=$BREEZEDARK_ID|" "$KDEGLOBALS"
+    else
+        sudo -u "$REAL_USER" sed -i "/^\[KDE\]/a LookAndFeelPackage=$BREEZEDARK_ID" "$KDEGLOBALS"
+    fi
+else
+    sudo -u "$REAL_USER" bash -c "printf '\n[KDE]\nLookAndFeelPackage=%s\n' '$BREEZEDARK_ID' >> '$KDEGLOBALS'"
+fi
+echo "==> Breeze Dark fijado como Tema Global por defecto."
+
 # ==========================================
-# 5.2 ICONOS VORTEX-DARK-ICONS (descargado en vivo) + ÍCONO DE LANZADOR ARCH LINUX
+# 5.2 ICONOS VORTEX-DARK-ICONS POR DEFECTO + ÍCONO DE LANZADOR ARCH LINUX
 # ==========================================
-echo "==> Descargando e instalando el pack de iconos Vortex-Dark-Icons desde la KDE Store..."
-ICONS_TMP=$(sudo -u "$REAL_USER" mktemp -d)
-ICONS_DIR="$USER_HOME/.local/share/icons"
-sudo -u "$REAL_USER" mkdir -p "$ICONS_DIR"
+echo "==> Instalando el tema de iconos Vortex-Dark-Icons desde KDE Store..."
+
+ICONS_TMP=$(mktemp -d)
+ICONS_ARCHIVE=$(fetch_kde_store_file "1493433" "$ICONS_TMP") || true
 
 ICON_THEME_ID="Vortex-Dark-Icons"
-if fetch_kde_store_file 1493433 "$ICONS_TMP/Vortex-Dark-Icons.pkg"; then
-    sudo -u "$REAL_USER" rm -rf "$ICONS_DIR/Vortex-Dark-Icons"
-    if sudo -u "$REAL_USER" bash -c "$(declare -f extract_tar_auto); extract_tar_auto '$ICONS_TMP/Vortex-Dark-Icons.pkg' '$ICONS_DIR'"; then
-        echo "==> Vortex-Dark-Icons extraído correctamente en $ICONS_DIR."
+
+if [ -n "${ICONS_ARCHIVE:-}" ] && [ -f "$ICONS_ARCHIVE" ]; then
+    ICONS_EXTRACT="$ICONS_TMP/extracted"
+    extract_archive "$ICONS_ARCHIVE" "$ICONS_EXTRACT" || true
+
+    ICONS_INDEX_THEME=$(find "$ICONS_EXTRACT" -maxdepth 3 -iname "index.theme" | head -n1 || true)
+    if [ -n "$ICONS_INDEX_THEME" ]; then
+        ICONS_SRC_DIR=$(dirname "$ICONS_INDEX_THEME")
+        ICON_THEME_ID=$(basename "$ICONS_SRC_DIR")
+        sudo mkdir -p "/usr/share/icons/$ICON_THEME_ID"
+        sudo cp -r "$ICONS_SRC_DIR"/* "/usr/share/icons/$ICON_THEME_ID/"
+        echo "==> Iconos '$ICON_THEME_ID' instalados en /usr/share/icons/$ICON_THEME_ID"
     else
-        echo "==> Aviso: no se pudo extraer el paquete descargado de Vortex-Dark-Icons."
+        echo "==> Aviso: no se encontró index.theme en el paquete descargado; se omite la instalación de los iconos."
     fi
 else
-    echo "==> Aviso: no se pudo descargar Vortex-Dark-Icons de la KDE Store."
+    echo "==> Aviso: no se pudo descargar Vortex-Dark-Icons automáticamente. Se continúa sin instalarlo (podés hacerlo manualmente después)."
 fi
 rm -rf "$ICONS_TMP"
 
-# Buscar el archivo archlinux-logo que ya está presente en el sistema (viene con YAMIS)
+# Buscar el archivo archlinux-logo ya presente en el sistema, para el ícono del lanzador
 echo "==> Buscando el archivo archlinux-logo ya presente en el sistema..."
-ARCH_LOGO_FILE="/usr/share/icons/yet-another-monochrome-icon-set/apps/scalable/archlinux.svg"
-if [ ! -f "$ARCH_LOGO_FILE" ]; then
+ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -iname "archlinux.svg" -type f 2>/dev/null | head -n1 || true)
+if [ -z "$ARCH_LOGO_FILE" ]; then
     ARCH_LOGO_FILE=$(find /usr/share "$USER_HOME" -iname "archlinux-logo*" -type f \( -iname "*.svg" -o -iname "*.png" -o -iname "*.svgz" \) 2>/dev/null | head -n1 || true)
-    if [ -z "$ARCH_LOGO_FILE" ]; then
-        ARCH_LOGO_FILE=$(find /usr/share/icons "$USER_HOME/.local/share/icons" -iname "archlinux.svg" -type f 2>/dev/null | head -n1 || true)
-    fi
 fi
 echo "==> Archivo archlinux-logo detectado: ${ARCH_LOGO_FILE:-(ninguno)}"
 
 if [ -n "$ARCH_LOGO_FILE" ]; then
     ARCH_LOGO_EXT="${ARCH_LOGO_FILE##*.}"
-    LAUNCHER_THEME_DIR="$USER_HOME/.local/share/icons/Vortex-ArchLauncher"
+
+    # Tema de iconos compuesto que hereda de Vortex-Dark-Icons y pisa el ícono del lanzador
+    LAUNCHER_THEME_DIR="$USER_HOME/.local/share/icons/${ICON_THEME_ID}-ArchLauncher"
     sudo -u "$REAL_USER" mkdir -p "$LAUNCHER_THEME_DIR/scalable/apps" "$LAUNCHER_THEME_DIR/scalable/places"
     for name in start-here-kde-plasma start-here-kde start-here; do
         sudo -u "$REAL_USER" cp "$ARCH_LOGO_FILE" "$LAUNCHER_THEME_DIR/scalable/apps/$name.$ARCH_LOGO_EXT"
@@ -347,8 +299,8 @@ if [ -n "$ARCH_LOGO_FILE" ]; then
     done
     sudo -u "$REAL_USER" bash -c "cat > '$LAUNCHER_THEME_DIR/index.theme'" << EOF
 [Icon Theme]
-Name=Vortex-Dark-Icons with Arch Launcher
-Comment=Vortex-Dark-Icons icon set with the Arch Linux launcher icon
+Name=$ICON_THEME_ID with Arch Launcher
+Comment=$ICON_THEME_ID icon set with the Arch Linux launcher icon
 Inherits=$ICON_THEME_ID,hicolor
 Directories=scalable/apps,scalable/places
 
@@ -366,9 +318,11 @@ MaxSize=512
 Type=Scalable
 Context=Places
 EOF
-    echo "==> Tema de iconos compuesto Vortex-ArchLauncher creado (hereda de $ICON_THEME_ID)."
-    ICON_THEME_ID="Vortex-ArchLauncher"
+    echo "==> Tema de iconos compuesto ${ICON_THEME_ID}-ArchLauncher creado (hereda de $ICON_THEME_ID)."
+    ICON_THEME_ID="${ICON_THEME_ID}-ArchLauncher"
 
+    # Editar el script de layout que Plasma ejecuta en el primer inicio de sesión
+    # para forzar el icono del widget del lanzador a la ruta absoluta del archivo.
     LAYOUT_JS="/usr/share/plasma/shells/org.kde.plasma.desktop/contents/layout.js"
     if [ -f "$LAYOUT_JS" ]; then
         sudo cp "$LAYOUT_JS" "$LAYOUT_JS.bak_orig" 2>/dev/null || true
@@ -387,9 +341,11 @@ EOF
             }
         ' "$LAYOUT_JS.bak_orig" | sudo tee "$LAYOUT_JS" > /dev/null
         echo "==> layout.js parcheado para usar $ARCH_LOGO_FILE como ícono del lanzador de aplicaciones."
+    else
+        echo "==> Aviso: no se encontró layout.js en la ruta esperada, se omite el parche del lanzador."
     fi
 else
-    echo "==> Aviso: no se encontró ningún archivo archlinux-logo en el sistema, se usará Vortex-Dark-Icons sin ícono de lanzador personalizado."
+    echo "==> Aviso: no se encontró ningún archivo archlinux-logo en el sistema, se usará $ICON_THEME_ID sin ícono de lanzador personalizado."
 fi
 
 KDEGLOBALS="$USER_HOME/.config/kdeglobals"
@@ -458,133 +414,156 @@ else
 fi
 
 # ==========================================
-# 5.4 FONDO DE PANTALLA VORTEX-WALLPAPER (descargado en vivo desde la KDE Store)
+# 5.4 CONFIGURAR WALLPAPER POR DEFECTO EN PLASMA (Nexus)
 # ==========================================
-echo "==> Descargando el fondo de pantalla Vortex-Wallpaper desde la KDE Store (id 1493413)..."
-WALLPAPER_TMP=$(mktemp -d)
-WALLPAPER_OK=0
+echo "==> Configurando wallpaper por defecto (Nexus)..."
 
-if fetch_kde_store_file 1493413 "$WALLPAPER_TMP/vortex-wallpaper.pkg"; then
-    WALLPAPER_OK=1
+WALLPAPER_NAME="Nexus"
+WALLPAPER_DIR="/usr/share/wallpapers/$WALLPAPER_NAME"
+
+if [ ! -d "$WALLPAPER_DIR" ]; then
+    echo "==> Aviso: no se encontró /usr/share/wallpapers/$WALLPAPER_NAME. Verificá el nombre exacto del wallpaper instalado."
 fi
 
-sudo mkdir -p /usr/share/wallpapers
+WALLPAPER_FILE=$(find "$WALLPAPER_DIR/contents/images" -type f \( -iname "*.png" -o -iname "*.jpg" \) 2>/dev/null | sort -V | tail -n1 || true)
 
-WALLPAPER_PKG_NAME="Vortex-Wallpaper"
-WALLPAPER_IMG_INSIDE=""
-if [ "$WALLPAPER_OK" = "1" ]; then
-    echo "==> Tipo de archivo descargado: $(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")"
-    # El archivo descargado puede ser directamente la imagen (PNG o JPEG), o un
-    # paquete comprimido que contiene la imagen adentro. Se detectan todos los casos.
-    FILETYPE=$(file -b "$WALLPAPER_TMP/vortex-wallpaper.pkg")
-    if echo "$FILETYPE" | grep -qiE "PNG image|JPEG image"; then
-        WALLPAPER_EXT="png"
-        echo "$FILETYPE" | grep -qi "JPEG image" && WALLPAPER_EXT="jpg"
-        WALLPAPER_IMG_INSIDE="$WALLPAPER_TMP/vortex-wallpaper.$WALLPAPER_EXT"
-        cp "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_IMG_INSIDE"
+# 1. Asegurar que el fondo por defecto esté fijado en los 'defaults' de Breeze Dark
+LNF_DEFAULTS="/usr/share/plasma/look-and-feel/org.kde.breezedark.desktop/contents/defaults"
+if [ -f "$LNF_DEFAULTS" ]; then
+    sudo sed -i '/^Image=/d' "$LNF_DEFAULTS" 2>/dev/null || true
+    if grep -q "^\[Wallpaper\]" "$LNF_DEFAULTS"; then
+        sudo sed -i "/^\[Wallpaper\]/a Image=$WALLPAPER_NAME" "$LNF_DEFAULTS"
     else
-        mkdir -p "$WALLPAPER_TMP/extracted"
-        extract_tar_auto "$WALLPAPER_TMP/vortex-wallpaper.pkg" "$WALLPAPER_TMP/extracted" 2>&1 || true
-        echo "==> Contenido extraído del wallpaper (recursivo): $(find "$WALLPAPER_TMP/extracted" -type f 2>/dev/null | tr '\n' ' ')"
-        # Si ya viene empaquetado como carpeta con metadata.json/desktop, usar esa carpeta directamente
-        EXISTING_PKG=$(find "$WALLPAPER_TMP/extracted" -maxdepth 2 -type f \( -name "metadata.json" -o -name "metadata.desktop" \) 2>/dev/null | head -n1 | xargs -r dirname || true)
-        if [ -n "$EXISTING_PKG" ]; then
-            WALLPAPER_PKG_NAME=$(basename "$EXISTING_PKG")
-            sudo mkdir -p /usr/share/wallpapers
-            sudo rm -rf "/usr/share/wallpapers/$WALLPAPER_PKG_NAME"
-            sudo cp -r "$EXISTING_PKG" "/usr/share/wallpapers/$WALLPAPER_PKG_NAME"
-            echo "==> El paquete ya venía armado como carpeta, se copió tal cual: $WALLPAPER_PKG_NAME"
-        else
-            FOUND_IMG=$(find "$WALLPAPER_TMP/extracted" \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) 2>/dev/null | sort -rV | head -n1 || true)
-            [ -n "$FOUND_IMG" ] && WALLPAPER_IMG_INSIDE="$FOUND_IMG"
-        fi
+        sudo bash -c "printf '\n[Wallpaper]\nImage=%s\n' '$WALLPAPER_NAME' >> '$LNF_DEFAULTS'"
     fi
 fi
 
-# Si tenemos una imagen suelta (no un paquete ya armado), construir el paquete
-# con el mismo formato que usa el resto de los wallpapers del sistema:
-# <nombre>/contents/images/<archivo> + metadata.json
-if [ -n "$WALLPAPER_IMG_INSIDE" ] && [ -f "$WALLPAPER_IMG_INSIDE" ]; then
-    IMG_BASENAME=$(basename "$WALLPAPER_IMG_INSIDE")
-    PKG_DIR="/usr/share/wallpapers/$WALLPAPER_PKG_NAME"
-    sudo mkdir -p "$PKG_DIR/contents/images"
-    sudo cp "$WALLPAPER_IMG_INSIDE" "$PKG_DIR/contents/images/$IMG_BASENAME"
-    sudo bash -c "cat > '$PKG_DIR/metadata.json'" << EOF
-{
-    "KPackageStructure": "Plasma/Wallpaper",
-    "KPlugin": {
-        "Id": "$WALLPAPER_PKG_NAME",
-        "Name": "$WALLPAPER_PKG_NAME"
-    }
-}
+# 2. Configurar la estructura en plasma-org.kde.plasma.desktop-appletsrc para el usuario
+PLASMRC="$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+
+if [ ! -f "$PLASMRC" ] || ! grep -q "\[Containments\]" "$PLASMRC"; then
+    # Generar la estructura base limpia que requiere Plasma para el fondo
+    sudo -u "$REAL_USER" bash -c "cat > '$PLASMRC'" << EOF
+[Containments][1]
+activityId=
+wallpaperplugin=org.kde.image
+
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
+ImageName=$WALLPAPER_NAME
 EOF
-    echo "==> Paquete de wallpaper armado en $PKG_DIR"
-    WALLPAPER_OK=1
-elif [ ! -d "/usr/share/wallpapers/$WALLPAPER_PKG_NAME" ]; then
-    WALLPAPER_OK=0
-fi
+else
+    # Si el archivo ya existe, actualizar o inyectar las líneas de imagen
+    if grep -q "\[Wallpaper\]\[org.kde.image\]\[General\]" "$PLASMRC"; then
+        sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=file:///usr/share/wallpapers/$WALLPAPER_NAME|" "$PLASMRC"
+        sudo -u "$REAL_USER" sed -i "s|^ImageName=.*|ImageName=$WALLPAPER_NAME|" "$PLASMRC"
+    else
+        sudo -u "$REAL_USER" bash -c "cat >> '$PLASMRC'" << EOF
 
-# Si el Tema Global se instaló, ajustar su contents/defaults para que el
-# "Image=" apunte exactamente al nombre del paquete que terminamos usando
-if [ "$WALLPAPER_OK" = "1" ] && [ -n "${GLOBALTHEME_ID:-}" ]; then
-    THEME_DEFAULTS="$USER_HOME/.local/share/plasma/look-and-feel/$GLOBALTHEME_ID/contents/defaults"
-    if [ -f "$THEME_DEFAULTS" ] && grep -q "^Image=" "$THEME_DEFAULTS"; then
-        sudo -u "$REAL_USER" sed -i "s|^Image=.*|Image=$WALLPAPER_PKG_NAME|" "$THEME_DEFAULTS"
-        echo "==> contents/defaults del Tema Global actualizado: Image=$WALLPAPER_PKG_NAME"
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/$WALLPAPER_NAME
+ImageName=$WALLPAPER_NAME
+EOF
     fi
 fi
 
-if [ "$WALLPAPER_OK" = "1" ] && [ -d "/usr/share/wallpapers/$WALLPAPER_PKG_NAME" ]; then
-    echo "==> Wallpaper $WALLPAPER_PKG_NAME instalado en /usr/share/wallpapers/"
-    FIRST_IMG=$(find "/usr/share/wallpapers/$WALLPAPER_PKG_NAME" -type f \( -iname "*.png" -o -iname "*.jpg" \) 2>/dev/null | head -n1 || true)
+# 3. Forzar el refresco dinámico si hay una sesión activa de Plasma
+USER_UID=$(id -u "$REAL_USER")
+RUNTIME_DIR="/run/user/$USER_UID"
+if [ -d "$RUNTIME_DIR" ] && [ -n "$WALLPAPER_FILE" ] && command -v plasma-apply-wallpaperimage &>/dev/null; then
+    sudo -u "$REAL_USER" XDG_RUNTIME_DIR="$RUNTIME_DIR" DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+        plasma-apply-wallpaperimage "$WALLPAPER_FILE" 2>/dev/null || true
+fi
 
-    if [ -n "$FIRST_IMG" ] && command -v plasma-apply-wallpaperimage &>/dev/null; then
-        sudo -u "$REAL_USER" env QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$RUNTIME_DIR" \
-            plasma-apply-wallpaperimage "$FIRST_IMG" || \
-            echo "==> Aviso: no se pudo aplicar el fondo de pantalla en vivo (normal si no hay sesión gráfica activa); quedará aplicado en el próximo inicio de sesión vía Vortex-Global-6."
+echo "==> Fondo 'Nexus' configurado por defecto."
+
+# ==========================================
+# 5.5 PANTALLA DE BIENVENIDA (SPLASH DE PLASMA): CRISTAL BAR ARCHLINUX
+# ==========================================
+echo "==> Instalando el splash 'Cristal Bar Archlinux' desde KDE Store..."
+
+SPLASH_TMP=$(mktemp -d)
+SPLASH_ARCHIVE=$(fetch_kde_store_file "1422319" "$SPLASH_TMP") || true
+
+if [ -n "${SPLASH_ARCHIVE:-}" ] && [ -f "$SPLASH_ARCHIVE" ]; then
+    SPLASH_EXTRACT="$SPLASH_TMP/extracted"
+    extract_archive "$SPLASH_ARCHIVE" "$SPLASH_EXTRACT" || true
+
+    SPLASH_META=$(find "$SPLASH_EXTRACT" -maxdepth 3 -iname "metadata.desktop" | head -n1 || true)
+    if [ -n "$SPLASH_META" ]; then
+        SPLASH_SRC_DIR=$(dirname "$SPLASH_META")
+        SPLASH_ID=$(grep -oP '(?<=X-KDE-PluginInfo-Name=).+' "$SPLASH_META" | head -n1 || true)
+        SPLASH_ID=${SPLASH_ID:-cristal-bar-archlinux}
+
+        sudo mkdir -p "/usr/share/plasma/splash/$SPLASH_ID"
+        sudo cp -r "$SPLASH_SRC_DIR"/* "/usr/share/plasma/splash/$SPLASH_ID/"
+        echo "==> Splash '$SPLASH_ID' instalado en /usr/share/plasma/splash/$SPLASH_ID"
+
+        KSPLASHRC="$USER_HOME/.config/ksplashrc"
+        sudo -u "$REAL_USER" mkdir -p "$USER_HOME/.config"
+        if [ -f "$KSPLASHRC" ] && grep -q "^\[KSplash\]" "$KSPLASHRC"; then
+            if grep -q "^Theme=" "$KSPLASHRC"; then
+                sudo -u "$REAL_USER" sed -i "s|^Theme=.*|Theme=$SPLASH_ID|" "$KSPLASHRC"
+            else
+                sudo -u "$REAL_USER" sed -i "/^\[KSplash\]/a Theme=$SPLASH_ID" "$KSPLASHRC"
+            fi
+        else
+            sudo -u "$REAL_USER" bash -c "printf '\n[KSplash]\nTheme=%s\n' '$SPLASH_ID' >> '$KSPLASHRC'"
+        fi
+        echo "==> '$SPLASH_ID' fijado como pantalla de bienvenida por defecto."
+    else
+        echo "==> Aviso: no se encontró metadata.desktop en el paquete descargado; se omite la instalación del splash."
     fi
 else
-    echo "==> Aviso: no se pudo obtener el wallpaper de Vortex de la KDE Store."
+    echo "==> Aviso: no se pudo descargar 'Cristal Bar Archlinux' automáticamente. Podés instalarlo manualmente después desde KDE Store (id 1422319)."
 fi
-rm -rf "$WALLPAPER_TMP"
+rm -rf "$SPLASH_TMP"
 
 # ==========================================
 # 6. CONFIGURACIÓN DE SYSTEM SERVICES, SDDM Y GRUB
 # ==========================================
-echo "==> Descargando e instalando el tema Vortex-SDDM-6 desde la KDE Store..."
+echo "==> Instalando y configurando el tema Earth Night para SDDM (desde KDE Store)..."
 
 SDDM_TMP=$(mktemp -d)
-SDDM_THEME_ID=""
-if fetch_kde_store_file 2148693 "$SDDM_TMP/Vortex-SDDM-6.pkg"; then
-    echo "==> Tipo de archivo descargado: $(file -b "$SDDM_TMP/Vortex-SDDM-6.pkg")"
-    mkdir -p "$SDDM_TMP/extracted"
-    if extract_tar_auto "$SDDM_TMP/Vortex-SDDM-6.pkg" "$SDDM_TMP/extracted"; then
-        echo "==> Contenido extraído (nivel superior): $(ls -1 "$SDDM_TMP/extracted" | tr '\n' ' ')"
-        DETECTED_SDDM_DIR=$(find "$SDDM_TMP/extracted" -maxdepth 2 -type f -name "metadata.desktop" 2>/dev/null | head -n1 | xargs -r dirname || true)
-        if [ -n "$DETECTED_SDDM_DIR" ]; then
-            SDDM_THEME_ID=$(basename "$DETECTED_SDDM_DIR")
-            sudo mkdir -p /usr/share/sddm/themes
-            sudo rm -rf "/usr/share/sddm/themes/$SDDM_THEME_ID"
-            sudo cp -r "$DETECTED_SDDM_DIR" "/usr/share/sddm/themes/$SDDM_THEME_ID"
-            echo "==> Tema SDDM instalado como: $SDDM_THEME_ID"
-        else
-            echo "==> Aviso: no se encontró ningún metadata.desktop dentro del paquete SDDM extraído."
+SDDM_ARCHIVE=$(fetch_kde_store_file "1225550" "$SDDM_TMP") || true
+
+SDDM_THEME_ID="earth-night"
+
+if [ -n "${SDDM_ARCHIVE:-}" ] && [ -f "$SDDM_ARCHIVE" ]; then
+    SDDM_EXTRACT="$SDDM_TMP/extracted"
+    extract_archive "$SDDM_ARCHIVE" "$SDDM_EXTRACT" || true
+
+    SDDM_MAIN_QML=$(find "$SDDM_EXTRACT" -maxdepth 4 -iname "Main.qml" | head -n1 || true)
+    if [ -n "$SDDM_MAIN_QML" ]; then
+        SDDM_SRC_DIR=$(dirname "$SDDM_MAIN_QML")
+        SDDM_META=$(find "$SDDM_SRC_DIR" -maxdepth 1 -iname "metadata.desktop" | head -n1 || true)
+        if [ -n "$SDDM_META" ]; then
+            META_ID=$(grep -oP '(?<=^Theme-Id=).+' "$SDDM_META" | head -n1 || true)
+            [ -n "$META_ID" ] && SDDM_THEME_ID="$META_ID"
         fi
+        sudo mkdir -p "/usr/share/sddm/themes/$SDDM_THEME_ID"
+        sudo cp -r "$SDDM_SRC_DIR"/* "/usr/share/sddm/themes/$SDDM_THEME_ID/"
+        echo "==> Tema SDDM '$SDDM_THEME_ID' instalado en /usr/share/sddm/themes/$SDDM_THEME_ID"
     else
-        echo "==> Aviso: no se pudo extraer el paquete descargado de Vortex-SDDM-6."
+        echo "==> Aviso: no se encontró Main.qml en el paquete descargado; se omite la instalación del tema SDDM."
+        SDDM_THEME_ID=""
     fi
 else
-    echo "==> Aviso: no se pudo descargar Vortex-SDDM-6 de la KDE Store."
+    echo "==> Aviso: no se pudo descargar el tema SDDM 'Earth Night' automáticamente (id 1225550)."
+    SDDM_THEME_ID=""
 fi
 rm -rf "$SDDM_TMP"
 
-if [ -n "$SDDM_THEME_ID" ] && [ -d "/usr/share/sddm/themes/$SDDM_THEME_ID" ]; then
+if [ -n "$SDDM_THEME_ID" ]; then
     echo "==> Configurando /etc/sddm.conf.d/theme.conf.user..."
     sudo mkdir -p /etc/sddm.conf.d
     sudo bash -c "cat > /etc/sddm.conf.d/theme.conf.user" << EOF
 [Theme]
 Current=$SDDM_THEME_ID
 EOF
+else
+    echo "==> Aviso: no se fijó ningún tema de SDDM porque la descarga o la detección del paquete falló."
 fi
 
 echo "==> Habilitando SDDM como Display Manager..."
@@ -629,11 +608,12 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: SDDM"
 echo " KDE Wallet: desactivado por defecto"
-echo " Tema Global: ${GLOBALTHEME_ID:-(no se pudo instalar, revisar salida arriba)}
- Pantalla de inicio de sesión (SDDM): ${SDDM_THEME_ID:-(no se pudo instalar, revisar salida arriba)}
- Icon theme: Vortex-Dark-Icons con ícono de lanzador Arch Linux
- Konsole: transparencia por defecto (Opacity=0.85)
- Fondo de pantalla: Vortex-Wallpaper.png"
+echo " Tema Global: Breeze Dark"
+echo " Icon theme: Vortex-Dark-Icons con ícono de lanzador Arch Linux"
+echo " Konsole: transparencia por defecto (Opacity=0.85)"
+echo " Fondo de pantalla: Nexus"
+echo " Splash de Plasma: Cristal Bar Archlinux"
+echo " Tema SDDM: Earth Night"
 echo "  
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
 S        I    NN  N  E      R   R  G   G    I    A   A
