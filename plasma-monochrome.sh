@@ -143,6 +143,8 @@ sudo pacman -S --noconfirm --needed \
   mate-icon-theme-faenza \
   rustdesk-bin \
   gnome-boxes \
+  koko \
+  kate \
   os-prober
 
 
