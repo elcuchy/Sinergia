@@ -126,6 +126,8 @@ sudo pacman -S --noconfirm --needed \
   powerdevil \
   plasma-systemmonitor \
   kwalletmanager \
+  kate \
+  koko \
   os-prober
 
 
