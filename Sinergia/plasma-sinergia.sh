@@ -168,7 +168,6 @@ if [ -f /etc/default/grub ]; then
     sudo grub-mkconfig -o /boot/grub/grub.cfg
 fi
 
-
 # ==========================================
 # 7. LIMPIEZA Y REINICIO
 # ==========================================
@@ -176,7 +175,16 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: SDDM"
+echo "  
+ SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
+S        I    NN  N  E      R   R  G   G    I    A   A
+S        I    N N N  E      R   R  G        I    A   A
+ SSS     I    N N N  EEEE   RRRR   G GGG    I    AAAAA
+    S    I    N  NN  E      R R    G   G    I    A   A
+    S    I    N   N  E      R  R   G   G    I    A   A
+SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
+echo "======================================================"
+echo "            COMUNIDAD    LINUXERA"
 echo "======================================================"
 
 read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
