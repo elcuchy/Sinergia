@@ -323,9 +323,15 @@ fi
 
 # Función que fija el icono del whisker menu (button-icon) en el
 # xfce4-panel.xml ya extraído, para el plugin cuyo tipo sea "whiskermenu".
+# En vez de asumir una ruta fija (que depende de cómo esté empaquetado el
+# .tar.bz2 del layout y del efecto de --strip-components), lo busca con
+# find bajo el directorio dado, así no falla en silencio si la estructura
+# interna del layout no es la esperada.
 set_whisker_icon() {
-    local PANEL_XML="$1/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
-    if [ -f "$PANEL_XML" ]; then
+    local BASE_DIR="$1"
+    local PANEL_XML
+    PANEL_XML=$(sudo find "$BASE_DIR" -type f -name "xfce4-panel.xml" 2>/dev/null | head -n1)
+    if [ -n "$PANEL_XML" ] && [ -f "$PANEL_XML" ]; then
         sudo python3 - "$PANEL_XML" "$LAUNCHER_ICON" << 'PYEOF'
 import sys
 import xml.etree.ElementTree as ET
@@ -352,19 +358,22 @@ if plugins is not None:
 
 tree.write(path, encoding="UTF-8", xml_declaration=True)
 PYEOF
+    else
+        echo "==> Advertencia: no se encontró xfce4-panel.xml bajo $BASE_DIR; no se pudo fijar el ícono ahí."
     fi
 }
 
 # Función que fija el icono del whisker menu directamente en xfconf, en
-# vivo, dentro de una sesión D-Bus del usuario. Esto es necesario porque
-# "Intento 1" (xfce4-panel-profiles load) escribe en la base de datos de
-# xfconf, no en el xfce4-panel.xml en disco; si solo editáramos el archivo
-# (set_whisker_icon), el ícono correcto no se vería hasta el próximo login.
-# Se ejecuta también aunque no se haya podido cargar el perfil Redmond 7,
-# por si el panel por defecto ya trae un plugin whiskermenu.
+# vivo, dentro de una sesión D-Bus del usuario. Necesario porque "Intento 1"
+# (xfce4-panel-profiles load) escribe en la base de datos de xfconf, no en
+# el xfce4-panel.xml en disco de forma directamente editable por nosotros.
+# IMPORTANTE: -p /plugins es una propiedad contenedora (no un valor
+# escalar), así que la consulta necesita el flag -l (list/recursivo) o
+# xfconf-query falla con "No existe la propiedad «/plugins»..." y la
+# búsqueda de IDs queda vacía sin avisar (por el 2>/dev/null).
 set_whisker_icon_live() {
     sudo -u "$REAL_USER" env ICON_PATH="$LAUNCHER_ICON" dbus-run-session bash -c '
-        PLUGIN_IDS=$(xfconf-query -c xfce4-panel -p /plugins -v 2>/dev/null \
+        PLUGIN_IDS=$(xfconf-query -c xfce4-panel -p /plugins -l -v 2>/dev/null \
             | awk "\$2==\"whiskermenu\" {print \$1}" \
             | grep -oE "[0-9]+$")
         for id in $PLUGIN_IDS; do
