@@ -323,11 +323,12 @@ fi
 
 # Función que fija el icono del whisker menu (button-icon) en el
 # xfce4-panel.xml ya extraído, para el plugin cuyo tipo sea "whiskermenu".
-# En vez de asumir una ruta fija (que depende de cómo esté empaquetado el
-# .tar.bz2 del layout y del efecto de --strip-components), lo busca con
-# find bajo el directorio dado, así no falla en silencio si la estructura
-# interna del layout no es la esperada.
-set_whisker_icon() {
+# Solo se usa para /etc/skel (usuarios futuros), donde no hay una sesión
+# D-Bus viva a la que aplicarle el cambio: ahí no queda otra que editar
+# el XML directamente. Busca el archivo con find en vez de asumir una
+# ruta fija, para no fallar en silencio si la estructura interna del
+# .tar.bz2 del layout no es la esperada.
+set_whisker_icon_file() {
     local BASE_DIR="$1"
     local PANEL_XML
     PANEL_XML=$(sudo find "$BASE_DIR" -type f -name "xfce4-panel.xml" 2>/dev/null | head -n1)
@@ -363,60 +364,51 @@ PYEOF
     fi
 }
 
-# Función que fija el icono del whisker menu directamente en xfconf, en
-# vivo, dentro de una sesión D-Bus del usuario. Necesario porque "Intento 1"
-# (xfce4-panel-profiles load) escribe en la base de datos de xfconf, no en
-# el xfce4-panel.xml en disco de forma directamente editable por nosotros.
-# IMPORTANTE: -p /plugins es una propiedad contenedora (no un valor
-# escalar), así que la consulta necesita el flag -l (list/recursivo) o
-# xfconf-query falla con "No existe la propiedad «/plugins»..." y la
-# búsqueda de IDs queda vacía sin avisar (por el 2>/dev/null).
-set_whisker_icon_live() {
-    sudo -u "$REAL_USER" env ICON_PATH="$LAUNCHER_ICON" dbus-run-session bash -c '
-        PLUGIN_IDS=$(xfconf-query -c xfce4-panel -p /plugins -l -v 2>/dev/null \
-            | awk "\$2==\"whiskermenu\" {print \$1}" \
-            | grep -oE "[0-9]+$")
-        for id in $PLUGIN_IDS; do
-            xfconf-query -c xfce4-panel -p "/plugins/plugin-${id}/button-icon" \
-                -n -t string -s "$ICON_PATH" 2>/dev/null || \
-            xfconf-query -c xfce4-panel -p "/plugins/plugin-${id}/button-icon" \
-                -s "$ICON_PATH" 2>/dev/null
-        done
-    ' || true
+# Para el usuario actual (en vivo) hacemos TODO en una sola sesión D-Bus:
+# cargar el perfil Redmond 7 y fijar el ícono del whiskermenu, en ese
+# orden, dentro del mismo proceso. Antes esto estaba repartido en dos
+# invocaciones separadas de dbus-run-session (una para cargar el perfil,
+# otra para el ícono) con una extracción de tar en el medio que volvía a
+# pisar el XML con el valor original — cada sesión D-Bus nueva arranca su
+# propio xfconfd, y esa mezcla de sesiones y reescrituras de archivo era
+# una condición de carrera real. Al hacerlo todo en una sola sesión
+# secuencial, no hay ventana donde algo más pueda pisar el cambio.
+apply_profile_and_icon_live() {
+    local LOAD_CMD=""
+    if [ -n "$LAYOUT_FILE" ]; then
+        LOAD_CMD="xfce4-panel-profiles load \"\$LAYOUT_PATH\"; sleep 2;"
+    fi
+    sudo -u "$REAL_USER" env LAYOUT_PATH="$LAYOUT_FILE" ICON_PATH="$LAUNCHER_ICON" \
+        dbus-run-session bash -c "
+            $LOAD_CMD
+            PLUGIN_IDS=\$(xfconf-query -c xfce4-panel -p /plugins -l -v 2>/dev/null \
+                | awk '\$2==\"whiskermenu\" {print \$1}' \
+                | grep -oE '[0-9]+\$')
+            for id in \$PLUGIN_IDS; do
+                xfconf-query -c xfce4-panel -p \"/plugins/plugin-\${id}/button-icon\" \
+                    -n -t string -s \"\$ICON_PATH\" 2>/dev/null || \
+                xfconf-query -c xfce4-panel -p \"/plugins/plugin-\${id}/button-icon\" \
+                    -s \"\$ICON_PATH\" 2>/dev/null
+            done
+        " || true
 }
 
 if [ -n "$LAYOUT_FILE" ]; then
-    # Intento 1: aplicar en caliente vía D-Bus (funciona si hay una sesión activa)
-    sudo -u "$REAL_USER" dbus-run-session bash -c \
-      "xfce4-panel-profiles load '$LAYOUT_FILE'" || true
+    apply_profile_and_icon_live
 
-    # Intento 2 (respaldo garantizado): extraer el layout directamente en la
-    # configuración del usuario actual, no solo en /etc/skel. Esto asegura
-    # que el perfil quede aplicado aunque el paso anterior por D-Bus falle
-    # silenciosamente (algo común antes del primer login gráfico).
-    sudo mkdir -p "$USER_HOME/.config/xfce4"
-    sudo tar -xjf "$LAYOUT_FILE" -C "$USER_HOME/.config/xfce4/" --strip-components=1 2>/dev/null || true
-    set_whisker_icon "$USER_HOME/.config"
-
-    # También se extrae en /etc/skel para que futuros usuarios hereden Redmond 7
+    # Extraer el layout en /etc/skel para que futuros usuarios lo hereden,
+    # y fijar ahí el ícono editando el XML directamente (no hay sesión
+    # D-Bus viva para un usuario que todavía no existe).
     sudo mkdir -p /etc/skel/.config/xfce4
     sudo tar -xjf "$LAYOUT_FILE" -C /etc/skel/.config/xfce4/ --strip-components=1 2>/dev/null || true
-    set_whisker_icon "/etc/skel/.config"
+    set_whisker_icon_file "/etc/skel/.config"
 else
     echo "==> Advertencia: No se encontró el archivo de layout Redmond 7. Verificá el nombre real con:"
     echo "    ls /usr/share/xfce4-panel-profiles/layouts/"
+    # Igual intentamos fijar el ícono por si el panel por defecto ya
+    # trae un plugin whiskermenu configurado.
+    apply_profile_and_icon_live
 fi
-
-# Fijar el ícono también en la base de datos xfconf en vivo, sea cual sea
-# el resultado de arriba (perfil cargado por D-Bus, o panel por defecto).
-set_whisker_icon_live
-
-# NOTA: "archlinux-logo" es el nombre de ícono que suelen usar temas como
-# Papirus para el logo de Arch. Si en tu sistema no aparece el logo (icono
-# roto/genérico), el tema activo probablemente lo llama distinto. Verificá con:
-#   find /usr/share/icons -iname "*archlinux*" 2>/dev/null
-# y si el nombre real es otro (ej. "distributor-logo-archlinux"), reemplazá
-# "archlinux-logo" por ese nombre en la función set_whisker_icon() de arriba.
 
 # Ajustar permisos finales
 sudo chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config"
