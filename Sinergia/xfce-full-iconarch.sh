@@ -305,16 +305,33 @@ for candidate in \
     fi
 done
 
+# Ícono del lanzador de aplicaciones (whisker menu). Usamos la ruta
+# absoluta al archivo en vez del nombre lógico "archlinux-logo", porque
+# el nombre lógico depende de que el tema de íconos activo lo tenga
+# indexado con ese nombre exacto — cosa que no pasaba en este sistema.
+LAUNCHER_ICON="/usr/share/pixmaps/archlinux-logo.svg"
+if [ ! -f "$LAUNCHER_ICON" ]; then
+    echo "==> Advertencia: no se encontró $LAUNCHER_ICON. Buscando alternativas..."
+    ALT_ICON=$(find /usr/share/pixmaps /usr/share/icons -iname "archlinux-logo*" 2>/dev/null | head -n1)
+    if [ -n "$ALT_ICON" ]; then
+        echo "==> Usando en su lugar: $ALT_ICON"
+        LAUNCHER_ICON="$ALT_ICON"
+    else
+        echo "==> No se encontró ningún archivo archlinux-logo.*. Se mantiene $LAUNCHER_ICON de todas formas."
+    fi
+fi
+
 # Función que fija el icono del whisker menu (button-icon) en el
 # xfce4-panel.xml ya extraído, para el plugin cuyo tipo sea "whiskermenu".
 set_whisker_icon() {
     local PANEL_XML="$1/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
     if [ -f "$PANEL_XML" ]; then
-        sudo python3 - "$PANEL_XML" << 'PYEOF'
+        sudo python3 - "$PANEL_XML" "$LAUNCHER_ICON" << 'PYEOF'
 import sys
 import xml.etree.ElementTree as ET
 
 path = sys.argv[1]
+icon_path = sys.argv[2]
 tree = ET.parse(path)
 root = tree.getroot()
 
@@ -331,7 +348,7 @@ if plugins is not None:
                 icon_prop = ET.SubElement(plugin, "property")
                 icon_prop.set("name", "button-icon")
                 icon_prop.set("type", "string")
-            icon_prop.set("value", "archlinux-logo")
+            icon_prop.set("value", icon_path)
 
 tree.write(path, encoding="UTF-8", xml_declaration=True)
 PYEOF
@@ -346,15 +363,15 @@ PYEOF
 # Se ejecuta también aunque no se haya podido cargar el perfil Redmond 7,
 # por si el panel por defecto ya trae un plugin whiskermenu.
 set_whisker_icon_live() {
-    sudo -u "$REAL_USER" dbus-run-session bash -c '
+    sudo -u "$REAL_USER" env ICON_PATH="$LAUNCHER_ICON" dbus-run-session bash -c '
         PLUGIN_IDS=$(xfconf-query -c xfce4-panel -p /plugins -v 2>/dev/null \
             | awk "\$2==\"whiskermenu\" {print \$1}" \
             | grep -oE "[0-9]+$")
         for id in $PLUGIN_IDS; do
             xfconf-query -c xfce4-panel -p "/plugins/plugin-${id}/button-icon" \
-                -n -t string -s "archlinux-logo" 2>/dev/null || \
+                -n -t string -s "$ICON_PATH" 2>/dev/null || \
             xfconf-query -c xfce4-panel -p "/plugins/plugin-${id}/button-icon" \
-                -s "archlinux-logo" 2>/dev/null
+                -s "$ICON_PATH" 2>/dev/null
         done
     ' || true
 }
@@ -421,7 +438,7 @@ echo " Display manager configurado: LightDM (GTK Greeter)"
 echo " Entorno de escritorio: XFCE 4 + xfce4-goodies"
 echo " Perfil de panel: Redmond 7"
 echo " Tema Global: Graphite-Dark"
-echo " Icon theme: Yaru-MATE con ícono de lanzador Arch Linux"
+echo " Icon theme: Yaru-MATE con ícono de lanzador: $LAUNCHER_ICON"
 echo " XFCE Terminal: transparencia por defecto (BackgroundDarkness=0.85)"
 echo " GRUB: os-prober habilitado (detección de otros SO)"
 echo "  
