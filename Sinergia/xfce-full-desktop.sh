@@ -438,55 +438,93 @@ else
     echo "==> Advertencia: no se pudo descargar el fondo de pantalla desde $WALLPAPER_URL"
 fi
 
+# ==========================================
+# 8. CONFIGURACIÓN DEL FONDO DE PANTALLA
+# ==========================================
+echo "==> Descargando el fondo de pantalla..."
+
+WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/main/wallpapers/30.png"
+WALLPAPER_DIR="/usr/share/backgrounds/archlinux-wallpapers"
+WALLPAPER_FILE="$WALLPAPER_DIR/30.png"
+
+# curl no viene en una instalación base de Arch por defecto; lo instalamos
+# si hace falta, sin tocar la lista grande de paquetes de la sección 4.
+if ! command -v curl >/dev/null 2>&1; then
+    sudo pacman -S --needed --noconfirm curl
+fi
+
+sudo mkdir -p "$WALLPAPER_DIR"
+if sudo curl -fsSL "$WALLPAPER_URL" -o "$WALLPAPER_FILE"; then
+    sudo chmod 644 "$WALLPAPER_FILE"
+    echo "==> Fondo de pantalla descargado en $WALLPAPER_FILE"
+else
+    echo "==> Advertencia: no se pudo descargar el fondo de pantalla desde $WALLPAPER_URL"
+fi
+
+# No podemos saber el nombre real del monitor (eDP-1, HDMI-1, DP-1, etc.)
+# desde este script: corre antes del primer login gráfico, sin servidor X
+# activo, en una PC que puede ser cualquiera. En vez de asumir un nombre
+# fijo (que solo funcionaría en la máquina donde se probó), dejamos una
+# tarea de autostart que corre UNA SOLA VEZ en el primer login real de
+# cualquier usuario en cualquier PC — momento en el que xrandr ya puede
+# leer el hardware real — y se autoelimina después de aplicar el fondo.
 if [ -f "$WALLPAPER_FILE" ]; then
-    # Función que escribe un xfce4-desktop.xml con una propiedad genérica
-    # "monitor0" (fallback estándar para instalaciones de un solo monitor
-    # antes del primer login, cuando XFCE todavía no detectó el nombre
-    # real del monitor conectado).
-    write_wallpaper_config() {
+    echo "==> Instalando tarea de primer-login para fijar el fondo según el monitor real..."
+
+    sudo tee /usr/local/bin/set-wallpaper-once.sh > /dev/null << EOF
+#!/bin/bash
+# Se ejecuta una sola vez en el primer login (ver autostart). Detecta los
+# monitores reales vía xrandr (ya disponibles porque corre dentro de la
+# sesión gráfica) y fija el fondo para cada uno. Al terminar, se borra a
+# sí mismo junto con la entrada de autostart que lo lanzó.
+
+WALLPAPER="$WALLPAPER_FILE"
+sleep 5
+
+if [ -f "\$WALLPAPER" ]; then
+    MONITORS=\$(xrandr --listmonitors 2>/dev/null | awk 'NR>1 {print \$NF}')
+    if [ -z "\$MONITORS" ]; then
+        MONITORS="monitor0"
+    fi
+    for m in \$MONITORS; do
+        xfconf-query -c xfce4-desktop -p "/backdrop/screen0/monitor\${m}/workspace0/last-image" \
+            -n -t string -s "\$WALLPAPER" 2>/dev/null || \
+        xfconf-query -c xfce4-desktop -p "/backdrop/screen0/monitor\${m}/workspace0/last-image" \
+            -s "\$WALLPAPER" 2>/dev/null
+        xfconf-query -c xfce4-desktop -p "/backdrop/screen0/monitor\${m}/workspace0/image-style" \
+            -n -t int -s 5 2>/dev/null
+    done
+fi
+
+rm -f "\$HOME/.config/autostart/set-wallpaper-once.desktop"
+rm -f "\$0"
+EOF
+    sudo chmod 755 /usr/local/bin/set-wallpaper-once.sh
+
+    write_wallpaper_autostart() {
         local TARGET_DIR="$1"
         local USER_NAME="$2"
-        sudo mkdir -p "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml"
-        sudo tee "$TARGET_DIR/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml" > /dev/null << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfce4-desktop" version="1.0">
-  <property name="backdrop" type="empty">
-    <property name="screen0" type="empty">
-      <property name="monitor0" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="last-image" type="string" value="$WALLPAPER_FILE"/>
-          <property name="image-style" type="int" value="5"/>
-        </property>
-      </property>
-    </property>
-  </property>
-</channel>
+        sudo mkdir -p "$TARGET_DIR/autostart"
+        sudo tee "$TARGET_DIR/autostart/set-wallpaper-once.desktop" > /dev/null << 'EOF'
+[Desktop Entry]
+Type=Application
+Exec=/usr/local/bin/set-wallpaper-once.sh
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+Name=Fijar fondo de pantalla (primera vez)
+Comment=Tarea única que fija el fondo de pantalla según el monitor detectado y se autoelimina
 EOF
         if [ "$USER_NAME" != "root" ]; then
-            sudo chown -R "$USER_NAME:$USER_NAME" "$TARGET_DIR/xfce4"
+            sudo chown -R "$USER_NAME:$USER_NAME" "$TARGET_DIR/autostart"
         fi
     }
 
-    write_wallpaper_config "/etc/skel/.config" "root"
-    write_wallpaper_config "$USER_HOME/.config" "$REAL_USER"
-
-    # Además, intentamos fijarlo en vivo: si ya existe alguna propiedad de
-    # fondo real (monitor detectado), la pisamos también, por si el archivo
-    # de arriba no alcanza a aplicarse (mismo enfoque que con el ícono del
-    # lanzador: todo en una sola sesión D-Bus para evitar condiciones de
-    # carrera entre sesiones separadas).
-    sudo -u "$REAL_USER" env WALLPAPER_PATH="$WALLPAPER_FILE" dbus-run-session bash -c '
-        EXISTING=$(xfconf-query -c xfce4-desktop -l -v 2>/dev/null \
-            | awk "/last-image$|image-path$/ {print \$1}")
-        for p in $EXISTING; do
-            xfconf-query -c xfce4-desktop -p "$p" -s "$WALLPAPER_PATH" 2>/dev/null
-        done
-        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image \
-            -n -t string -s "$WALLPAPER_PATH" 2>/dev/null
-        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/image-style \
-            -n -t int -s 5 2>/dev/null
-    ' || true
+    write_wallpaper_autostart "/etc/skel/.config" "root"
+    write_wallpaper_autostart "$USER_HOME/.config" "$REAL_USER"
 fi
+
+
 
 
 # ==========================================
