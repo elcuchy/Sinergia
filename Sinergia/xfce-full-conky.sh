@@ -424,9 +424,9 @@ sudo chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config"
 # ==========================================
 echo "==> Descargando el fondo de pantalla..."
 
-WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/main/wallpapers/04.png"
+WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/main/wallpapers/09.png"
 WALLPAPER_DIR="/usr/share/backgrounds/archlinux-wallpapers"
-WALLPAPER_FILE="$WALLPAPER_DIR/04.png"
+WALLPAPER_FILE="$WALLPAPER_DIR/09.png"
 
 # curl no viene en una instalación base de Arch por defecto; lo instalamos
 # si hace falta, sin tocar la lista grande de paquetes de la sección 4.
