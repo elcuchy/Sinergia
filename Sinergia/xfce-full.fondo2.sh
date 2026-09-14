@@ -216,9 +216,7 @@ sudo -u "$REAL_USER" yay -S --needed --noconfirm \
   aimp \
   iptvnator-bin \
   yaru-colors-icon-theme \
-  fetch-git \
-  web-greeter \
-  shikai-theme
+  fetch-git
 
 
 # ==========================================
@@ -420,34 +418,11 @@ sudo chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config"
 # ==========================================
 # 8. CONFIGURACIÓN DEL FONDO DE PANTALLA
 # ==========================================
-echo "==> Descargando y configurando el fondo de pantalla..."
-
-WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/main/wallpapers/30.png"
-WALLPAPER_DIR="/usr/share/backgrounds/archlinux-wallpapers"
-WALLPAPER_FILE="$WALLPAPER_DIR/30.png"
-
-# curl no viene en una instalación base de Arch por defecto; lo instalamos
-# si hace falta, sin tocar la lista grande de paquetes de la sección 4.
-if ! command -v curl >/dev/null 2>&1; then
-    sudo pacman -S --needed --noconfirm curl
-fi
-
-sudo mkdir -p "$WALLPAPER_DIR"
-if sudo curl -fsSL "$WALLPAPER_URL" -o "$WALLPAPER_FILE"; then
-    sudo chmod 644 "$WALLPAPER_FILE"
-    echo "==> Fondo de pantalla descargado en $WALLPAPER_FILE"
-else
-    echo "==> Advertencia: no se pudo descargar el fondo de pantalla desde $WALLPAPER_URL"
-fi
-
-# ==========================================
-# 8. CONFIGURACIÓN DEL FONDO DE PANTALLA
-# ==========================================
 echo "==> Descargando el fondo de pantalla..."
 
-WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/main/wallpapers/30.png"
+WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/main/wallpapers/04.png"
 WALLPAPER_DIR="/usr/share/backgrounds/archlinux-wallpapers"
-WALLPAPER_FILE="$WALLPAPER_DIR/30.png"
+WALLPAPER_FILE="$WALLPAPER_DIR/04.png"
 
 # curl no viene en una instalación base de Arch por defecto; lo instalamos
 # si hace falta, sin tocar la lista grande de paquetes de la sección 4.
@@ -532,19 +507,8 @@ fi
 # ==========================================
 # 9. CONFIGURACIÓN DE SYSTEM SERVICES Y GRUB
 # ==========================================
-echo "==> Configurando LightDM con Web Greeter (tema Shikai)..."
-sudo sed -i 's/#\?greeter-session=.*/greeter-session=web-greeter/' /etc/lightdm/lightdm.conf
-
-# Fijar el tema Shikai en la configuración del propio Web Greeter. El
-# paquete web-greeter crea /etc/lightdm/web-greeter.yml con un valor
-# "theme:" por defecto (bajo la clave "greeter:"); lo reemplazamos por
-# "shikai" preservando la indentación original de la línea.
-if [ -f /etc/lightdm/web-greeter.yml ]; then
-    sudo sed -i 's/^\([[:space:]]*theme:\).*/\1 shikai/' /etc/lightdm/web-greeter.yml
-else
-    echo "==> Advertencia: no se encontró /etc/lightdm/web-greeter.yml; revisá manualmente la clave 'theme' bajo 'greeter:' y ponela en 'shikai'."
-fi
-
+echo "==> Configurando LightDM con GTK Greeter..."
+sudo sed -i 's/#\?greeter-session=.*/greeter-session=lightdm-gtk-greeter/' /etc/lightdm/lightdm.conf
 sudo systemctl enable lightdm
 
 echo "==> Configurando GRUB para detectar otros SO..."
@@ -561,7 +525,7 @@ rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: LightDM (Web Greeter, tema Shikai)"
+echo " Display manager configurado: LightDM (GTK Greeter)"
 echo " Entorno de escritorio: XFCE 4 + xfce4-goodies"
 echo " Perfil de panel: openSUSE Leap 15.x"
 echo " Tema Global: Graphite-Dark"
