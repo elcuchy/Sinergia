@@ -338,18 +338,19 @@ fi
 
 
 # ==========================================
-# 7. APLICACIÓN DEL PERFIL REDMOND 7
+# 7. APLICACIÓN DEL PERFIL OPENSUSE LEAP 15.X
 # ==========================================
-echo "==> Cargando el perfil Redmond 7 en el usuario $REAL_USER..."
+echo "==> Cargando el perfil openSUSE Leap 15.x en el usuario $REAL_USER..."
 
-# El nombre exacto de archivo puede variar según el paquete (algunos lo
-# empaquetan como "redmond7.tar.bz2", otros como "Redmond 7.tar.bz2").
-# Probamos las variantes más comunes en orden.
+# El nombre exacto de archivo puede variar según cómo esté empaquetado
+# (mayúsculas, espacios, versión). Confirmado en este sistema como
+# "openSUSE Leap 15.x.tar.bz2"; se agregan variantes razonables como
+# respaldo, sin garantía de que existan (no verificadas).
 LAYOUT_FILE=""
 for candidate in \
-    "/usr/share/xfce4-panel-profiles/layouts/redmond7.tar.bz2" \
-    "/usr/share/xfce4-panel-profiles/layouts/redmond-7.tar.bz2" \
-    "/usr/share/xfce4-panel-profiles/layouts/Redmond 7.tar.bz2"; do
+    "/usr/share/xfce4-panel-profiles/layouts/openSUSE Leap 15.x.tar.bz2" \
+    "/usr/share/xfce4-panel-profiles/layouts/opensuse-leap-15.x.tar.bz2" \
+    "/usr/share/xfce4-panel-profiles/layouts/OpenSUSE Leap 15.x.tar.bz2"; do
     if [ -f "$candidate" ]; then
         LAYOUT_FILE="$candidate"
         break
@@ -416,7 +417,7 @@ PYEOF
 }
 
 # Para el usuario actual (en vivo) hacemos TODO en una sola sesión D-Bus:
-# cargar el perfil Redmond 7 y fijar el ícono del whiskermenu, en ese
+# cargar el perfil openSUSE Leap 15.x y fijar el ícono del whiskermenu, en ese
 # orden, dentro del mismo proceso. Antes esto estaba repartido en dos
 # invocaciones separadas de dbus-run-session (una para cargar el perfil,
 # otra para el ícono) con una extracción de tar en el medio que volvía a
@@ -424,13 +425,6 @@ PYEOF
 # propio xfconfd, y esa mezcla de sesiones y reescrituras de archivo era
 # una condición de carrera real. Al hacerlo todo en una sola sesión
 # secuencial, no hay ventana donde algo más pueda pisar el cambio.
-#
-# NOTA: con el perfil Redmond 7 específicamente, esto no alcanzó en su
-# momento — algo en cómo se asienta ese layout después de cargado parece
-# reconstruir el plugin del whiskermenu y pisar el ícono más tarde, ya
-# fuera de esta ventana. Por eso, más abajo, se deja además una tarea de
-# primer-login que reintenta fijar el ícono ya con el panel totalmente
-# asentado en una sesión real.
 apply_profile_and_icon_live() {
     local LOAD_CMD=""
     if [ -n "$LAYOUT_FILE" ]; then
@@ -461,7 +455,7 @@ if [ -n "$LAYOUT_FILE" ]; then
     sudo tar -xjf "$LAYOUT_FILE" -C /etc/skel/.config/xfce4/ --strip-components=1 2>/dev/null || true
     set_whisker_icon_file "/etc/skel/.config"
 else
-    echo "==> Advertencia: No se encontró el archivo de layout Redmond 7. Verificá el nombre real con:"
+    echo "==> Advertencia: No se encontró el archivo de layout openSUSE Leap 15.x. Verificá el nombre real con:"
     echo "    ls /usr/share/xfce4-panel-profiles/layouts/"
     # Igual intentamos fijar el ícono por si el panel por defecto ya
     # trae un plugin whiskermenu configurado.
@@ -470,59 +464,6 @@ fi
 
 # Ajustar permisos finales
 sudo chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config"
-
-# Tarea de primer-login: reintenta fijar el ícono del whiskermenu ya con
-# el panel completamente asentado en una sesión real (no la sesión D-Bus
-# aislada de más arriba). Es el mismo patrón que usamos para el fondo de
-# pantalla y las interfaces de red: corre una sola vez y se autoelimina.
-echo "==> Instalando tarea de primer-login para reforzar el ícono del lanzador..."
-
-sudo tee /usr/local/bin/fix-launcher-icon.sh > /dev/null << EOF
-#!/bin/bash
-# Se ejecuta una sola vez en el primer login real. Espera a que el panel
-# termine de asentarse (por si Redmond 7 reconstruye el whiskermenu
-# después de cargarse) y recién ahí fija el ícono.
-
-ICON_PATH="$LAUNCHER_ICON"
-sleep 10
-
-PLUGIN_IDS=\$(xfconf-query -c xfce4-panel -p /plugins -l -v 2>/dev/null \\
-    | awk '\$2=="whiskermenu" {print \$1}' \\
-    | grep -oE '[0-9]+\$')
-
-for id in \$PLUGIN_IDS; do
-    xfconf-query -c xfce4-panel -p "/plugins/plugin-\${id}/button-icon" \\
-        -n -t string -s "\$ICON_PATH" 2>/dev/null || \\
-    xfconf-query -c xfce4-panel -p "/plugins/plugin-\${id}/button-icon" \\
-        -s "\$ICON_PATH" 2>/dev/null
-done
-
-rm -f "\$HOME/.config/autostart/fix-launcher-icon.desktop"
-rm -f "\$0"
-EOF
-sudo chmod 755 /usr/local/bin/fix-launcher-icon.sh
-
-write_launcher_icon_autostart() {
-    local TARGET_DIR="$1"
-    local USER_NAME="$2"
-    sudo mkdir -p "$TARGET_DIR/autostart"
-    sudo tee "$TARGET_DIR/autostart/fix-launcher-icon.desktop" > /dev/null << 'EOF'
-[Desktop Entry]
-Type=Application
-Exec=/usr/local/bin/fix-launcher-icon.sh
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-Name=Fijar ícono del lanzador (primera vez)
-Comment=Tarea única que refuerza el ícono del whiskermenu ya con el panel asentado
-EOF
-    if [ "$USER_NAME" != "root" ]; then
-        sudo chown -R "$USER_NAME:$USER_NAME" "$TARGET_DIR/autostart"
-    fi
-}
-
-write_launcher_icon_autostart "$USER_HOME/.config" "$REAL_USER"
-write_launcher_icon_autostart "/etc/skel/.config" "root"
 
 
 # ==========================================
@@ -735,7 +676,7 @@ echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
 echo " Display manager configurado: LightDM (GTK Greeter)"
 echo " Entorno de escritorio: XFCE 4 + xfce4-goodies"
-echo " Perfil de panel: Redmond 7"
+echo " Perfil de panel: openSUSE Leap 15.x"
 echo " Tema Global: Graphite-Dark"
 echo " Icon theme: $ICON_THEME_NAME con ícono de lanzador: $LAUNCHER_ICON"
 echo " Fondo de pantalla: $WALLPAPER_FILE"
