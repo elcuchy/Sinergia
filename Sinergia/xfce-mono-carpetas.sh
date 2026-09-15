@@ -157,6 +157,8 @@ sudo pacman -S --noconfirm --needed \
   ulauncher \
   audacious \
   pamac-aur \
+  xdg-user-dirs \
+  xdg-user-dirs-gtk \
   gvfs-dnssd \
   gvfs-wsdd \
   rygel \
@@ -188,7 +190,6 @@ sudo pacman -S --noconfirm --needed \
   arc-gtk-theme \
   colloid-gtk-theme-git \
   graphite-gtk-theme-black-normal-git \
-  xdg-user-dirs \
   os-prober
 
 # NOTA: xfce4-whiskermenu-plugin, xfce4-docklike-plugin y xfce4-windowck-plugin
@@ -196,7 +197,12 @@ sudo pacman -S --noconfirm --needed \
 # (Redmond, Redmond 7, Cupertino, Unity). Sin ellos, esos perfiles cargan
 # incompletos o directamente fallan al aplicarse. "plank" se agrega porque
 # el layout Cupertino (estilo macOS) espera un dock tipo plank disponible.
-
+# "xdg-user-dirs" y "xdg-user-dirs-gtk" se agregan porque sin ellos el
+# $HOME del usuario queda sin las carpetas estándar (Documentos, Imágenes,
+# Descargas, Música, Vídeos, Escritorio, Público, Plantillas): ese paquete
+# trae el autostart que las genera en el primer login gráfico. Se agrega
+# además un paso explícito más abajo para generarlas ya mismo, sin
+# depender de ese primer login.
 
 # ==========================================
 # 5. INSTALACIÓN DE YAY Y PAQUETES AUR
@@ -223,15 +229,6 @@ sudo -u "$REAL_USER" yay -S --needed --noconfirm \
   yaru-colors-icon-theme \
   fetch-git
 
-# ==========================================
-# 5.1 CREACIÓN DE CARPETAS PERSONALES (Documentos, Imágenes, etc.)
-# ==========================================
-echo "==> Creando las carpetas estándar del usuario (Documentos, Imágenes, Descargas, etc.)..."
-sudo -u "$REAL_USER" xdg-user-dirs-update
-
-# También para /etc/skel, así los usuarios que se creen después ya las
-# tienen desde el primer login.
-sudo env HOME=/etc/skel xdg-user-dirs-update
 
 # ==========================================
 # 6. CONFIGURACIÓN DE APARIENCIA Y ENTORNO
@@ -334,6 +331,32 @@ if ! grep -q "QT_QPA_PLATFORMTHEME" /etc/environment; then
     echo "QT_QPA_PLATFORMTHEME=qt5ct" | sudo tee -a /etc/environment
 fi
 
+# ==========================================
+# 6.1 GENERACIÓN DE CARPETAS DE USUARIO (XDG)
+# ==========================================
+# xdg-user-dirs normalmente crea Documentos, Imágenes, Descargas, Música,
+# Vídeos, Escritorio, Público y Plantillas vía un autostart que corre en
+# el primer login gráfico (/etc/xdg/autostart/xdg-user-dirs.desktop).
+# Lo forzamos acá para que las carpetas ya existan sin depender de ese
+# primer login, tanto para el usuario real como para /etc/skel (así los
+# futuros usuarios del sistema también las heredan al crearse).
+echo "==> Generando carpetas de usuario estándar (Documentos, Imágenes, etc.)..."
+
+if command -v xdg-user-dirs-update >/dev/null 2>&1; then
+    sudo -u "$REAL_USER" env HOME="$USER_HOME" \
+        XDG_CONFIG_HOME="$USER_HOME/.config" \
+        xdg-user-dirs-update || \
+        echo "==> Advertencia: xdg-user-dirs-update falló para $REAL_USER; las carpetas se crearán en el próximo login."
+
+    # También lo corremos contra /etc/skel para que usuarios creados
+    # después de este script hereden la config de carpetas ya definida.
+    sudo env HOME="/etc/skel" XDG_CONFIG_HOME="/etc/skel/.config" \
+        xdg-user-dirs-update || true
+
+    sudo chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config" 2>/dev/null || true
+else
+    echo "==> Advertencia: xdg-user-dirs-update no está disponible; revisá que el paquete xdg-user-dirs se haya instalado."
+fi
 
 # ==========================================
 # 7. APLICACIÓN DEL PERFIL OPENSUSE LEAP 15.X
