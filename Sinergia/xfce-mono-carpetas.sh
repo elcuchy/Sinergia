@@ -188,6 +188,7 @@ sudo pacman -S --noconfirm --needed \
   arc-gtk-theme \
   colloid-gtk-theme-git \
   graphite-gtk-theme-black-normal-git \
+  xdg-user-dirs \
   os-prober
 
 # NOTA: xfce4-whiskermenu-plugin, xfce4-docklike-plugin y xfce4-windowck-plugin
