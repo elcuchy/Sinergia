@@ -156,7 +156,7 @@ sudo pacman -S --noconfirm --needed \
   nano \
   ulauncher \
   audacious \
-  pamac-aur \
+  shelly \
   gvfs-dnssd \
   gvfs-wsdd \
   rygel \
