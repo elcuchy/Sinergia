@@ -149,7 +149,7 @@ sudo pacman -S --noconfirm \
   nano \
   ulauncher \
   audacious \
-  pamac-aur \
+  shelly \
   os-prober
 
 # ==========================================
