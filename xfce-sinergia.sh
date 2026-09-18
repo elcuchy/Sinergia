@@ -172,12 +172,41 @@ yay -S stacer-bin --noconfirm
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-# 6. Habilitar el gestor de inicio de TDE
+# 6. Habilitar el gestor de inicio
 sudo systemctl enable lightdm
 
-# 7. Limpieza opcional
-rm -rf ~/LinuxScripts
+# ==========================================
+# 7. LIMPIEZA Y RESUMEN FINAL
+# ==========================================
+rm -rf "$HOME/LinuxScripts"
 
-# 8. Reiniciar
-echo "Instalación completada. Reiniciando el sistema..."
-sudo reboot
+echo "======================================================"
+echo " Instalación y configuración completadas con éxito."
+echo " Display manager configurado: LightDM (GTK Greeter)"
+echo " Entorno de escritorio: XFCE 4 + xfce4-goodies"
+echo " Repositorios habilitados: multilib, chaotic-aur"
+echo " Gestor de paquetes AUR: yay"
+echo " GRUB: os-prober habilitado (detección de otros SO)"
+echo " Respaldo de pacman.conf: /etc/pacman.conf.bak_repos"
+echo "  
+ SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
+S        I    NN  N  E      R   R  G   G    I    A   A
+S        I    N N N  E      R   R  G        I    A   A
+ SSS     I    N N N  EEEE   RRRR   G GGG    I    AAAAA
+    S    I    N  NN  E      R R    G   G    I    A   A
+    S    I    N   N  E      R  R   G   G    I    A   A
+SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
+echo "======================================================"
+echo "            COMUNIDAD    LINUXERA"
+echo "======================================================"
+
+read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
+case "$respuesta" in
+    [sS]|"")
+        echo "==> Reiniciando..."
+        sudo reboot
+        ;;
+    *)
+        echo "==> Reinicio cancelado. Recordá reiniciar manualmente para aplicar los cambios."
+        ;;
+esac
