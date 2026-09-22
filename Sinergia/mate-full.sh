@@ -113,7 +113,8 @@ sudo pacman -S --noconfirm \
   mate-applet-dock \
   plank \
   synapse \
-  vala-panel-appmenu-mate
+  vala-panel-appmenu-mate \
+  mate-netbook \
   python-gobject \
   dbus \
   lightdm \
