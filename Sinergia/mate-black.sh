@@ -311,6 +311,28 @@ else
     echo "   - No se encontró synapse.desktop, se omite el autostart."
 fi
 
+echo "==> Configurando autostart del dock (Plank) según el perfil de panel..."
+sudo tee /usr/local/bin/dock-autostart > /dev/null << 'DOCKEOF'
+#!/bin/bash
+dock=$(dconf read /org/mate/session/required-components/dock 2>/dev/null | tr -d "'")
+[ -n "$dock" ] && exec "$dock"
+DOCKEOF
+sudo chmod +x /usr/local/bin/dock-autostart
+
+sudo mkdir -p /etc/xdg/autostart
+sudo tee /etc/xdg/autostart/dock-autostart.desktop > /dev/null << 'DESKEOF'
+[Desktop Entry]
+Type=Application
+Name=Dock Autostart
+Comment=Inicia el dock (ej. Plank) segun el perfil de panel activo
+Exec=/usr/local/bin/dock-autostart
+Icon=plank
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=2
+NoDisplay=true
+DESKEOF
+
 echo "==> Creando lanzadores de perfiles de panel (evitan el filtro de mate-tweak)..."
 sudo mkdir -p /usr/share/applications
 
