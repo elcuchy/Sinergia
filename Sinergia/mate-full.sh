@@ -184,6 +184,90 @@ for f in eleven.layout eleven.dock redmond.layout mutiny.layout mutiny.dock \
 done
 # Nota: dentro de mate-tweak, Cupertino aparece internamente como "eleven".
 
+echo "==> Generando layout propio para el perfil Manjaro..."
+sudo tee /usr/share/mate-panel/layouts/manjaro.layout > /dev/null << 'LAYOUTEOF'
+[Toplevel bottom]
+expand=true
+orientation=bottom
+size=28
+
+[Object briskmenu]
+object-type=applet
+applet-iid=BriskMenuFactory::BriskMenu
+toplevel-id=bottom
+position=0
+locked=true
+
+[Object showdesktopapplet]
+locked=true
+position=10
+toplevel-id=bottom
+applet-iid=WnckletFactory::ShowDesktopApplet
+object-type=applet
+
+[Object window-list]
+object-type=applet
+applet-iid=WnckletFactory::WindowListApplet
+toplevel-id=bottom
+position=20
+locked=true
+
+[Object workspace-switcher]
+object-type=applet
+applet-iid=WnckletFactory::WorkspaceSwitcherApplet
+toplevel-id=bottom
+position=10
+relative-to-edge=end
+locked=true
+
+[Object drivemountapplet]
+object-type=applet
+applet-iid=DriveMountAppletFactory::DriveMountApplet
+toplevel-id=bottom
+position=30
+relative-to-edge=end
+locked=true
+
+[Object notification-area]
+object-type=applet
+applet-iid=NotificationAreaAppletFactory::NotificationArea
+toplevel-id=bottom
+position=20
+relative-to-edge=end
+locked=true
+
+[Object indicatorappletcomplete]
+object-type=applet
+applet-iid=IndicatorAppletCompleteFactory::IndicatorAppletComplete
+toplevel-id=bottom
+position=0
+relative-to-edge=end
+locked=true
+LAYOUTEOF
+
+echo "==> Creando script central para cambiar de layout (panel + dock)..."
+sudo tee /usr/local/bin/set-panel-layout > /dev/null << 'HELPEREOF'
+#!/bin/bash
+# Uso: set-panel-layout <nombre-de-layout>
+layout="$1"
+[ -z "$layout" ] && { echo "Uso: set-panel-layout <layout>"; exit 1; }
+
+killall mate-panel 2>/dev/null
+mate-panel --reset --layout "$layout"
+
+dockfile="/usr/share/mate-panel/layouts/${layout}.dock"
+if [ -s "$dockfile" ]; then
+    dockapp=$(tr -d '[:space:]' < "$dockfile")
+    dconf write /org/mate/session/required-components/dock "'${dockapp}'"
+    killall "$dockapp" 2>/dev/null
+    nohup "$dockapp" >/dev/null 2>&1 &
+else
+    dconf write /org/mate/session/required-components/dock "''"
+    killall plank 2>/dev/null
+fi
+HELPEREOF
+sudo chmod +x /usr/local/bin/set-panel-layout
+
 echo "==> Creando lanzadores de perfiles de panel (evitan el filtro de mate-tweak)..."
 sudo mkdir -p /usr/share/applications
 
@@ -194,6 +278,7 @@ declare -A PANEL_LAYOUTS=(
     ["netbook"]="Perfil de Panel: Netbook"
     ["contemporary"]="Perfil de Panel: Contemporary"
     ["pantheon"]="Perfil de Panel: Pantheon"
+    ["manjaro"]="Perfil de Panel: Manjaro"
 )
 
 for layout in "${!PANEL_LAYOUTS[@]}"; do
@@ -203,7 +288,7 @@ for layout in "${!PANEL_LAYOUTS[@]}"; do
 Type=Application
 Name=${name}
 Comment=Cambia el layout del panel de MATE a ${layout}
-Exec=sh -c 'killall mate-panel; mate-panel --reset --layout ${layout}'
+Exec=/usr/local/bin/set-panel-layout ${layout}
 Icon=mate-panel
 Terminal=false
 Categories=Settings;DesktopSettings;
