@@ -163,7 +163,7 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S gtk2 stacer-bin mate-menu topmenu-gtk --noconfirm
+yay -S stacer-bin mate-menu mate-layouts --noconfirm
 
 # 5. Configurar GRUB para detectar otros sistemas operativos
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
