@@ -184,6 +184,33 @@ for f in eleven.layout eleven.dock redmond.layout mutiny.layout mutiny.dock \
 done
 # Nota: dentro de mate-tweak, Cupertino aparece internamente como "eleven".
 
+echo "==> Creando lanzadores de perfiles de panel (evitan el filtro de mate-tweak)..."
+sudo mkdir -p /usr/share/applications
+
+declare -A PANEL_LAYOUTS=(
+    ["eleven"]="Perfil de Panel: Cupertino"
+    ["redmond"]="Perfil de Panel: Redmond"
+    ["mutiny"]="Perfil de Panel: Mutiny"
+    ["netbook"]="Perfil de Panel: Netbook"
+    ["contemporary"]="Perfil de Panel: Contemporary"
+    ["pantheon"]="Perfil de Panel: Pantheon"
+)
+
+for layout in "${!PANEL_LAYOUTS[@]}"; do
+    name="${PANEL_LAYOUTS[$layout]}"
+    sudo tee "/usr/share/applications/panel-layout-${layout}.desktop" > /dev/null << EOF
+[Desktop Entry]
+Type=Application
+Name=${name}
+Comment=Cambia el layout del panel de MATE a ${layout}
+Exec=sh -c 'killall mate-panel; mate-panel --reset --layout ${layout}'
+Icon=mate-panel
+Terminal=false
+Categories=Settings;DesktopSettings;
+NoDisplay=false
+EOF
+done
+
 # 5. Configurar GRUB para detectar otros sistemas operativos
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
 sudo grub-mkconfig -o /boot/grub/grub.cfg
