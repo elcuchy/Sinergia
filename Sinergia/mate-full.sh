@@ -163,7 +163,26 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin mate-menu mate-layouts --noconfirm
+yay -S stacer-bin mate-menu --noconfirm
+
+# ==========================================
+# 4.1 PERFILES DE PANEL PARA MATE-TWEAK
+#     (Cupertino, Redmond, Mutiny, Netbook, etc.)
+# ==========================================
+echo "==> Instalando layouts de panel adicionales para mate-tweak..."
+sudo mkdir -p /usr/share/mate-panel/layouts
+LAYOUTS_BASE="https://raw.githubusercontent.com/ubuntu-mate/ubuntu-mate-settings/master/usr/share/mate-panel/layouts"
+for f in eleven.layout eleven.dock redmond.layout mutiny.layout mutiny.dock \
+         netbook.layout contemporary.layout familiar.layout pantheon.layout \
+         pantheon.dock ubuntu-mate.layout; do
+    if sudo curl -fsSL "$LAYOUTS_BASE/$f" -o "/usr/share/mate-panel/layouts/$f"; then
+        echo "   - $f OK"
+    else
+        echo "   - $f no se pudo descargar, se omite"
+        sudo rm -f "/usr/share/mate-panel/layouts/$f"
+    fi
+done
+# Nota: dentro de mate-tweak, Cupertino aparece internamente como "eleven".
 
 # 5. Configurar GRUB para detectar otros sistemas operativos
 sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
