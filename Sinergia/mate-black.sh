@@ -260,11 +260,11 @@ mate-panel --reset --layout "$layout"
 dockfile="/usr/share/mate-panel/layouts/${layout}.dock"
 if [ -s "$dockfile" ]; then
     dockapp=$(tr -d '[:space:]' < "$dockfile")
-    dconf write /org/mate/session/required-components/dock "'${dockapp}'"
+    dconf write /org/mate/desktop/session/required-components/dock "'${dockapp}'"
     killall "$dockapp" 2>/dev/null
     nohup "$dockapp" >/dev/null 2>&1 &
 else
-    dconf write /org/mate/session/required-components/dock "''"
+    dconf write /org/mate/desktop/session/required-components/dock "''"
     killall plank 2>/dev/null
 fi
 HELPEREOF
@@ -280,23 +280,29 @@ sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/re
     -o /usr/share/backgrounds/archlinux-wallpaper.png
 
 echo "==> Configurando valores por defecto de MATE (dconf)..."
+sudo mkdir -p /etc/dconf/profile
+sudo tee /etc/dconf/profile/user > /dev/null << 'PROFILEEOF'
+user-db:user
+system-db:local
+PROFILEEOF
+
 sudo mkdir -p /etc/dconf/db/local.d
 sudo tee /etc/dconf/db/local.d/01-mate-defaults > /dev/null << 'DCONFEOF'
-[org/mate/background]
+[org/mate/desktop/background]
 picture-filename='/usr/share/backgrounds/archlinux-wallpaper.png'
 picture-options='zoom'
 
-[org/mate/interface]
+[org/mate/desktop/interface]
 gtk-theme='BlackMATE'
 icon-theme='matefaenzagray'
 
-[org/mate/Marco/general]
+[org/mate/marco/general]
 theme='BlackMATE'
 
 [org/mate/panel/general]
 default-layout='pantheon'
 
-[org/mate/session/required-components]
+[org/mate/desktop/session/required-components]
 dock='plank'
 DCONFEOF
 sudo dconf update
@@ -314,7 +320,7 @@ fi
 echo "==> Configurando autostart del dock (Plank) según el perfil de panel..."
 sudo tee /usr/local/bin/dock-autostart > /dev/null << 'DOCKEOF'
 #!/bin/bash
-dock=$(dconf read /org/mate/session/required-components/dock 2>/dev/null | tr -d "'")
+dock=$(dconf read /org/mate/desktop/session/required-components/dock 2>/dev/null | tr -d "'")
 [ -n "$dock" ] && exec "$dock"
 DOCKEOF
 sudo chmod +x /usr/local/bin/dock-autostart
