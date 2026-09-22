@@ -149,6 +149,19 @@ sudo pacman -S --noconfirm \
   nano \
   audacious \
   shelly \
+  obs-studio \
+  audacity \
+  ardour \
+  kdenlive \
+  ventoy \
+  papirus-icon-theme \
+  mint-l-icons \
+  mint-x-icons \
+  mint-y-icons \
+  mate-icon-theme-faenza \
+  rustdesk-bin \
+  transmission-gtk \
+  gnome-boxes \
   os-prober
 
 # ==========================================
@@ -165,7 +178,7 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin mate-menu --noconfirm
+yay -S stacer-bin mate-menu sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
 
 # ==========================================
 # 4.1 PERFILES DE PANEL PARA MATE-TWEAK
