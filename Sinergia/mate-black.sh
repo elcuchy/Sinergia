@@ -260,6 +260,37 @@ relative-to-edge=end
 locked=true
 LAYOUTEOF
 
+echo "==> Personalizando layout del perfil Pantheon (menu izq. / synapse+red+reloj der.)..."
+sudo tee /usr/share/mate-panel/layouts/pantheon.layout > /dev/null << 'LAYOUTEOF'
+[Toplevel top]
+expand=true
+orientation=top
+size=28
+
+[Object briskmenu]
+object-type=applet
+applet-iid=BriskMenuFactory::BriskMenu
+toplevel-id=top
+position=0
+locked=true
+
+[Object notification-area]
+object-type=applet
+applet-iid=NotificationAreaAppletFactory::NotificationArea
+toplevel-id=top
+position=20
+panel-right-stick=true
+locked=true
+
+[Object clock]
+object-type=applet
+applet-iid=ClockAppletFactory::ClockApplet
+toplevel-id=top
+position=10
+panel-right-stick=true
+locked=true
+LAYOUTEOF
+
 echo "==> Creando script central para cambiar de layout (panel + dock)..."
 sudo tee /usr/local/bin/set-panel-layout > /dev/null << 'HELPEREOF'
 #!/bin/bash
@@ -268,7 +299,25 @@ layout="$1"
 [ -z "$layout" ] && { echo "Uso: set-panel-layout <layout>"; exit 1; }
 
 killall mate-panel 2>/dev/null
+dconf reset -f /org/mate/panel/
 mate-panel --reset --layout "$layout"
+sleep 1
+
+# mate-panel a veces duplica las entradas de object-id-list al resetear;
+# esto las deja unicas preservando el orden.
+ids=$(dconf read /org/mate/panel/general/object-id-list 2>/dev/null)
+if [ -n "$ids" ]; then
+    dedup=$(python3 -c "
+import ast
+lst = ast.literal_eval('''$ids''')
+seen = []
+for x in lst:
+    if x not in seen:
+        seen.append(x)
+print(seen)
+" 2>/dev/null)
+    [ -n "$dedup" ] && dconf write /org/mate/panel/general/object-id-list "$dedup"
+fi
 
 dockfile="/usr/share/mate-panel/layouts/${layout}.dock"
 if [ -s "$dockfile" ]; then
@@ -289,7 +338,7 @@ sudo chmod +x /usr/local/bin/set-panel-layout
 # ==========================================
 echo "==> Descargando fondo de pantalla por defecto..."
 sudo mkdir -p /usr/share/backgrounds
-sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/01.png" \
+sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/26.png" \
     -o /usr/share/backgrounds/archlinux-wallpaper.png
 
 echo "==> Configurando valores por defecto de MATE (dconf)..."
@@ -307,7 +356,7 @@ picture-options='zoom'
 
 [org/mate/desktop/interface]
 gtk-theme='BlackMATE'
-icon-theme='matefaenzagray'
+icon-theme='Mint-Y-Yaru'
 
 [org/mate/marco/general]
 theme='BlackMATE'
