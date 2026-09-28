@@ -208,15 +208,34 @@ fi
 
 
 # ==========================================
-# 7. LIMPIEZA Y REINICIO
+# 9. LIMPIEZA Y REINICIO
 # ==========================================
+USER_HOME="$HOME"
+
+echo "==> Limpiando carpeta del script..."
 rm -rf "$USER_HOME/LinuxScripts"
 
 echo "======================================================"
 echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: LightDM (Slick Greeter)"
+echo " Display manager configurado: GDM"
+echo " Entorno de escritorio: GNOME Shell"
+echo " Extensiones: Dash to Dock, Arc Menu, Burn My Windows,"
+echo "              Compiz Magic Lamp, Coverflow Alt-Tab,"
+echo "              Astra Monitor"
+echo " Terminal: Gnome Terminal"
+echo " Gestor de archivos: Nautilus"
+echo " Repositorios activos: kiro (nemesis_repo) + chaotic-aur"
+echo "  
+ SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
+S        I    NN  N  E      R   R  G   G    I    A   A
+S        I    N N N  E      R   R  G        I    A   A
+ SSS     I    N N N  EEEE   RRRR   G GGG    I    AAAAA
+    S    I    N  NN  E      R R    G   G    I    A   A
+    S    I    N   N  E      R  R   G   G    I    A   A
+SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
 echo "======================================================"
-
+echo "            COMUNIDAD    LINUXERA"
+echo "======================================================"
 read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
 case "$respuesta" in
     [sS]|"")
