@@ -435,17 +435,23 @@ patch_cfg() {
     rm -rf "$work"
 }
 
-# Desde Enlightenment 0.24 aprox., el tema principal de E es el tema de Elementary (EFL),
-# guardado en base.cfg (clave "theme"), no en e.cfg.
+# En las versiones actuales de Enlightenment, el tema y los iconos del menú y
+# de la barra (iBar) salen de la configuración de Elementary (base.cfg), no de e.cfg.
 patch_elm_cfg() {
-    local cfg=$1 work elm_theme
-    [ -n "${E_THEME:-}" ] || return 0
-    elm_theme="${E_THEME%.edj}"
+    local cfg=$1 work ok=1
+    [ -n "${E_THEME:-}" ] || [ -n "${ICON_THEME:-}" ] || return 0
     work=$(mktemp -d) || return 1
     if ! eet -d "$cfg" config "$work/base.src" > /dev/null 2>&1; then
         log "No se pudo decodificar $cfg"; rm -rf "$work"; return 1
     fi
-    if ! set_value "$work/base.src" theme string "$elm_theme"; then
+    if [ -n "${E_THEME:-}" ]; then
+        set_value "$work/base.src" theme string "${E_THEME%.edj}" || ok=0
+    fi
+    if [ -n "${ICON_THEME:-}" ]; then
+        # Reemplaza los iconos internos de Elementary por el tema de iconos elegido
+        set_value "$work/base.src" icon_theme string "$ICON_THEME" || ok=0
+    fi
+    if [ "$ok" -ne 1 ]; then
         log "Error editando $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
     fi
     cp "$cfg" "$work/base.cfg"
@@ -485,12 +491,12 @@ else
     log "No existe $BASE; se omite."
 fi
 
-# Perfiles de Elementary (tema principal de Enlightenment y de las apps EFL)
+# Perfiles de Elementary (tema e iconos de Enlightenment, su menú, la barra y las apps EFL)
 if [ -d "$ELM_BASE" ]; then
     n=0
     while IFS= read -r -d '' cfg; do
         n=$((n + 1))
-        if patch_elm_cfg "$cfg"; then log "Tema aplicado: $cfg"; else rc=1; fi
+        if patch_elm_cfg "$cfg"; then log "Tema e iconos aplicados: $cfg"; else rc=1; fi
     done < <(find "$ELM_BASE" -mindepth 2 -maxdepth 2 -name base.cfg -print0)
     [ "$n" -gt 0 ] || log "No se encontraron perfiles en $ELM_BASE."
 else
@@ -525,6 +531,8 @@ if [ -d "$USER_HOME/.e/e/config" ] || [ -d "$USER_HOME/.elementary/config" ]; th
     echo "==> Aplicando la apariencia a la configuración existente de $REAL_USER..."
     sudo -u "$REAL_USER" -H /usr/local/bin/linuxera-e-look --user \
         || echo "==> Aviso: no se pudo aplicar a la configuración de $REAL_USER."
+    # Forzar que EFL regenere su caché de iconos con el tema nuevo
+    rm -rf "$USER_HOME/.cache/efreet"
 fi
 
 # ---------- 7.5 Iconos para aplicaciones GTK ----------
