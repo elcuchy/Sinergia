@@ -337,9 +337,27 @@ sudo chmod +x /usr/local/bin/set-panel-layout
 # 4.2 APARIENCIA Y VALORES POR DEFECTO
 #     (tema, iconos, fondo, perfil de panel, synapse)
 # ==========================================
+echo "==> Generando tema de íconos con el logo de Arch para el menú..."
+sudo mkdir -p /usr/share/icons/Mint-Y-Yaru-Arch/scalable/places
+sudo tee /usr/share/icons/Mint-Y-Yaru-Arch/index.theme > /dev/null << 'THEMEEOF'
+[Icon Theme]
+Name=Mint-Y-Yaru-Arch
+Comment=Mint-Y-Yaru con el logo de Arch Linux en el menu
+Inherits=Mint-Y-Yaru
+Directories=scalable/places
+
+[scalable/places]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Places
+THEMEEOF
+sudo cp /usr/share/pixmaps/archlinux-logo.svg /usr/share/icons/Mint-Y-Yaru-Arch/scalable/places/start-here.svg
+
 echo "==> Descargando fondo de pantalla por defecto..."
 sudo mkdir -p /usr/share/backgrounds
-sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/26.png" \
+sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/39.png" \
     -o /usr/share/backgrounds/archlinux-wallpaper.png
 
 echo "==> Configurando valores por defecto de MATE (dconf)..."
@@ -357,7 +375,7 @@ picture-options='zoom'
 
 [org/mate/desktop/interface]
 gtk-theme='BlackMATE'
-icon-theme='Mint-Y-Yaru'
+icon-theme='Mint-Y-Yaru-Arch'
 
 [org/mate/marco/general]
 theme='BlackMATE'
@@ -382,7 +400,7 @@ sudo tee /etc/lightdm/slick-greeter.conf > /dev/null << 'SLICKEOF'
 [Greeter]
 background=/usr/share/backgrounds/archlinux-wallpaper.png
 theme-name=BlackMATE
-icon-theme-name=Mint-Y-Yaru
+icon-theme-name=Mint-Y-Yaru-Arch
 SLICKEOF
 
 echo "==> Configurando Synapse para iniciar junto con la sesión..."
