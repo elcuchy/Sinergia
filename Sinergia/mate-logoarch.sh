@@ -302,13 +302,15 @@ layout="$1"
 killall mate-panel 2>/dev/null
 dconf reset -f /org/mate/panel/
 mate-panel --reset --layout "$layout"
-sleep 1
 
-# mate-panel a veces duplica las entradas de object-id-list al resetear;
-# esto las deja unicas preservando el orden.
-ids=$(dconf read /org/mate/panel/general/object-id-list 2>/dev/null)
-if [ -n "$ids" ]; then
-    dedup=$(python3 -c "
+# mate-panel a veces duplica las entradas de object-id-list al resetear,
+# y algunos applets (como el menu) se registran tarde via D-Bus.
+# Reintenta la deduplicacion varias veces para agarrar tambien esos casos.
+for i in 1 2 3; do
+    sleep 1
+    ids=$(dconf read /org/mate/panel/general/object-id-list 2>/dev/null)
+    if [ -n "$ids" ]; then
+        dedup=$(python3 -c "
 import ast
 lst = ast.literal_eval('''$ids''')
 seen = []
@@ -317,8 +319,9 @@ for x in lst:
         seen.append(x)
 print(seen)
 " 2>/dev/null)
-    [ -n "$dedup" ] && dconf write /org/mate/panel/general/object-id-list "$dedup"
-fi
+        [ -n "$dedup" ] && dconf write /org/mate/panel/general/object-id-list "$dedup"
+    fi
+done
 
 dockfile="/usr/share/mate-panel/layouts/${layout}.dock"
 if [ -s "$dockfile" ]; then
