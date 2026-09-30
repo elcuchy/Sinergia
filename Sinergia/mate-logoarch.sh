@@ -355,6 +355,30 @@ Context=Places
 THEMEEOF
 sudo cp /usr/share/pixmaps/archlinux-logo.svg /usr/share/icons/Mint-Y-Yaru-Arch/scalable/places/start-here.svg
 
+echo "==> Configurando lanzadores por defecto de Plank (evita que se auto-siembre roto)..."
+sudo mkdir -p /etc/skel/.config/plank/dock1/launchers
+sudo tee /etc/skel/.config/plank/dock1/launchers/eom.dockitem > /dev/null << 'EOF'
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/eom.desktop
+EOF
+sudo tee /etc/skel/.config/plank/dock1/launchers/firefox.dockitem > /dev/null << 'EOF'
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/firefox.desktop
+EOF
+sudo tee /etc/skel/.config/plank/dock1/launchers/libreoffice-writer.dockitem > /dev/null << 'EOF'
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/libreoffice-writer.desktop
+EOF
+sudo tee /etc/skel/.config/plank/dock1/launchers/mpv.dockitem > /dev/null << 'EOF'
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/mpv.desktop
+EOF
+
+echo "==> Evitando menú duplicado de LibreOffice con el menú global (vala-panel-appmenu)..."
+if ! grep -q "^SAL_USE_VCLPLUGIN=" /etc/environment 2>/dev/null; then
+    echo "SAL_USE_VCLPLUGIN=gen" | sudo tee -a /etc/environment > /dev/null
+fi
+
 echo "==> Descargando fondo de pantalla por defecto..."
 sudo mkdir -p /usr/share/backgrounds
 sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/39.png" \
