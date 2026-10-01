@@ -360,21 +360,9 @@ sudo cp /usr/share/pixmaps/archlinux-logo.svg /usr/share/icons/Mint-Y-Yaru-Arch/
 
 echo "==> Configurando lanzadores por defecto de Plank (evita que se auto-siembre roto)..."
 sudo mkdir -p /etc/skel/.config/plank/dock1/launchers
-sudo tee /etc/skel/.config/plank/dock1/launchers/eom.dockitem > /dev/null << 'EOF'
+sudo tee /etc/skel/.config/plank/dock1/launchers/matecc.dockitem > /dev/null << 'EOF'
 [PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/eom.desktop
-EOF
-sudo tee /etc/skel/.config/plank/dock1/launchers/firefox.dockitem > /dev/null << 'EOF'
-[PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/firefox.desktop
-EOF
-sudo tee /etc/skel/.config/plank/dock1/launchers/libreoffice-writer.dockitem > /dev/null << 'EOF'
-[PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/libreoffice-writer.desktop
-EOF
-sudo tee /etc/skel/.config/plank/dock1/launchers/mpv.dockitem > /dev/null << 'EOF'
-[PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/mpv.desktop
+Launcher=file:///usr/share/applications/matecc.desktop
 EOF
 
 echo "==> Evitando menú duplicado de LibreOffice con el menú global (vala-panel-appmenu)..."
