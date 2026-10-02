@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # ==========================================
@@ -387,8 +388,8 @@ echo "==> Configurando lanzadores por defecto de Plank (evita que se auto-siembr
 # /etc/skel NO sirve aca: la cuenta del usuario ya existe (se crea durante la
 # instalacion base de Arch, antes de este script), asi que hay que aplicar el
 # fix directo sobre su carpeta real, igual que a cualquier cuenta ya creada.
-killall plank 2>/dev/null
-chattr -i "$HOME/.config/plank/dock1/launchers/" 2>/dev/null
+killall plank 2>/dev/null || true
+chattr -i "$HOME/.config/plank/dock1/launchers/" 2>/dev/null || true
 rm -rf "$HOME/.config/plank/dock1/launchers"
 mkdir -p "$HOME/.config/plank/dock1/launchers"
 tee "$HOME/.config/plank/dock1/launchers/matecc.dockitem" > /dev/null << 'EOF'
