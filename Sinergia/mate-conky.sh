@@ -523,14 +523,14 @@ with open(path, "r") as f:
     content = f.read()
 
 ncores = os.cpu_count() or 1
-if ncores >= 2:
-    cpu1_block = (
-        '\${color #C0C0C0}CPU1: \${color #FFFFFF}\${cpu cpu1}% \$alignr '
-        '\${exec awk \'/cpu MHz/{i++}i==1{printf "%.f",\$4; exit}\' /proc/cpuinfo}MHz    '
-        '\${hwmon 0 temp 3}°C\n\${cpubar cpu1 12, 200}\n\${color #C0C0C0}\${cpugraph cpu1 12, 200}'
+cpu_extra_blocks = []
+for n in range(1, ncores):
+    cpu_extra_blocks.append(
+        "\${color #C0C0C0}CPU" + str(n) + ": \${color #FFFFFF}\${cpu cpu" + str(n) + "}%\n"
+        + "\${cpubar cpu" + str(n) + " 12, 200}\n"
+        + "\${color #C0C0C0}\${cpugraph cpu" + str(n) + " 12, 200}"
     )
-else:
-    cpu1_block = ""
+cpu1_block = "\n".join(cpu_extra_blocks)
 
 replacements = {
     "__OS_INFO__": '''\${execi 999999 awk -F'"' '/PRETTY_NAME/{print \$2}' /etc/os-release}''',
