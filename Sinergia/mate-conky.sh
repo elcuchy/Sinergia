@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # ==========================================
@@ -424,6 +425,7 @@ with open(path, "r") as f:
     content = f.read()
 
 replacements = {
+    '${execi 999999 lsb_release -ds}': '''${execi 999999 awk -F'"' '/PRETTY_NAME/{print $2}' /etc/os-release}''',
     '${exec aptitude --version | head -n 1}': '${execi 999999 pacman -Q pacman}',
     '${execi 3600 aptitude search "~U" | wc -l | tail}': '${execi 3600 checkupdates 2>/dev/null | wc -l}',
     '${execi 900 dpkg -l | grep -c ^i}': '${execi 900 pacman -Q | wc -l}',
