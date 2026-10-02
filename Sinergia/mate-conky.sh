@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # ==========================================
@@ -193,6 +192,7 @@ sudo pacman -S --noconfirm \
   unzip \
   ufw \
   pacman-contrib \
+  ttf-monofur \
   gnome-boxes \
   os-prober
 
@@ -403,35 +403,138 @@ Launcher=file:///usr/share/applications/matecc.desktop
 EOF
 chattr +i "$HOME/.config/plank/dock1/launchers/" 2>/dev/null || echo "   - chattr no soportado en este filesystem, se omite la protección"
 
-echo "==> Instalando widget de sistema Conky (SystemMon)..."
+echo "==> Instalando widget de sistema Conky..."
 # Nota: esto se instala en la carpeta personal del usuario que corre el script,
 # igual que el fix de Plank de arriba - no aplica retroactivamente a otras cuentas.
-if curl -fsSL "https://raw.githubusercontent.com/Morbidlogic/SystemMon/main/SystemMon_4core_V0.1.zip" -o /tmp/systemmon.zip; then
-    rm -rf /tmp/systemmon_extract
-    mkdir -p /tmp/systemmon_extract
-    unzip -oq /tmp/systemmon.zip -d /tmp/systemmon_extract
+rm -rf "$HOME/.conky"
+mkdir -p "$HOME/.conky"
 
-    mkdir -p "$HOME/.conky"
-    rm -rf "$HOME/.conky/SystemMon"
-    cp -r /tmp/systemmon_extract/SystemMon4 "$HOME/.conky/SystemMon"
+# Deteccion de hardware real de esta maquina (disco raiz, interfaz de red activa).
+CONKY_ROOT_PART=$(findmnt -no SOURCE / 2>/dev/null)
+CONKY_ROOT_DEV=$(lsblk -no pkname "$CONKY_ROOT_PART" 2>/dev/null | head -1)
+[ -z "$CONKY_ROOT_DEV" ] && CONKY_ROOT_DEV=$(basename "$CONKY_ROOT_PART" 2>/dev/null)
+[ -z "$CONKY_ROOT_DEV" ] && CONKY_ROOT_DEV="sda"
 
-    # Adaptar las lineas especificas de Debian/Ubuntu (aptitude, dpkg, ufw con sudo)
-    # a sus equivalentes en Arch. Se usa Python (reemplazo de texto literal) en vez
-    # de sed porque estas lineas tienen demasiados caracteres especiales ($, |, ^).
-    python3 << 'PYEOF'
+CONKY_IFACE=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
+[ -z "$CONKY_IFACE" ] && CONKY_IFACE=$(ip -br link show up 2>/dev/null | awk '$1!="lo"{print $1; exit}')
+[ -z "$CONKY_IFACE" ] && CONKY_IFACE="eth0"
+
+tee "$HOME/.conky/conkyrc" > /dev/null << 'CONKYEOF'
+-- vim: ts=4 sw=4 noet ai cindent syntax=lua
+conky.config = {
+    alignment = 'top_right',
+    background = true,
+    border_width = 0,
+    cpu_avg_samples = 2,
+	default_color = '#C0C0C0',
+    default_outline_color = '#C0C0C0',
+    default_shade_color = '#C0C0C0',
+    draw_borders = true,
+    draw_graph_borders = true,
+    draw_outline = false,
+    draw_shades = false,
+    use_xft = true,
+    font = 'fixed:size=10:bold',
+    gap_x = 0,
+    gap_y = 28,
+    minimum_height = 5,
+	minimum_width = 5,
+    net_avg_samples = 2,
+    no_buffers = true,
+    out_to_console = false,
+    out_to_stderr = false,
+    extra_newline = false,
+    own_window = true,
+	own_window_transparent = true,
+	own_window_hints = 'undecorated,skip_taskbar,below,skip_pager,sticky',
+    stippled_borders = 0,
+	temperature_unit = 'celsius';
+    update_interval = 1,
+    uppercase = false,
+    use_spacer = 'none',
+    show_graph_scale = false,
+    show_graph_range = false,
+	double_buffer = true,
+	own_window_type = 'normal',
+	own_window_class = 'conky',
+	own_window_title = 'conky',
+	maximum_width = 200,
+}
+conky.text = [[
+ 
+${color #C0C0C0}OS: ${color #FFFFFF}__OS_INFO__
+${color #C0C0C0}Kernel: ${color #FFFFFF}$kernel
+${color #C0C0C0}System: ${color #FFFFFF}${exec cat /sys/devices/virtual/dmi/id/product_name}
+${color #C0C0C0}Uptime: ${color #FFFFFF}$uptime
+
+${color #C0C0C0}COMMAND           ${color #C0C0C0}MEM%  CPU%
+${color #FFFFFF}${top name 1}${top mem 1}${top cpu 1}
+${color #FFFFFF}${top name 2}${top mem 2}${top cpu 2}
+${color #FFFFFF}${top name 3}${top mem 3}${top cpu 3}
+
+${color #C0C0C0}Processes: ${color #FFFFFF}$processes${color #C0C0C0}${alignr}Running: ${color #FFFFFF}$running_processes
+
+${color #C0C0C0}CPU0: ${color #FFFFFF}${cpu cpu0}% $alignr ${exec awk '/cpu MHz/{i++}i==1{printf "%.f",$4; exit}' /proc/cpuinfo}MHz    ${hwmon 0 temp 2}°C
+${cpubar cpu0 12, 200}
+${color #C0C0C0}${cpugraph cpu0 12, 200}
+__CPU1_BLOCK__
+${color #C0C0C0}MEM%: ${color #FFFFFF}$memperc%${alignr}$mem / $memmax
+${membar 12, 200}
+${color #C0C0C0}${memgraph 12, 200}
+${color #C0C0C0}SWAP: ${color #FFFFFF}$swapperc%${alignr}$swap / $swapmax
+${color #FFFFFF}${swapbar 12, 200}
+${color #C0C0C0}${diskiograph __ROOTDEV__ 12, 200}
+
+${color #C0C0C0}EXT4: ${color #FFFFFF}${fs_used_perc /}%  ${fs_used /} /${alignr}${fs_size /}
+${fs_bar 12, 200 /}
+${color #C0C0C0}${diskiograph __ROOTDEV__ 12, 200}
+
+${color #C0C0C0}WLAN: ${color #FFFFFF}${wireless_link_qual_perc __IFACE__}% ${alignr}${color #C0C0C0}${color #FFFFFF}${upspeed __IFACE__} / ${downspeed __IFACE__}
+${color #FFFFFF}${wireless_link_bar 12, 200 __IFACE__}
+${color #C0C0C0}${upspeedgraph __IFACE__ 12, 97} ${alignr}${downspeedgraph __IFACE__ 12,96}
+
+${color #C0C0C0}WLAN: ${color #FFFFFF}${addr __IFACE__}${font}
+${color #C0C0C0}ESSID: ${color #FFFFFF}${wireless_essid __IFACE__}${font}
+${color #C0C0C0}ROUTE: ${color #FFFFFF}${execi 60 ip route | sed -n "1 p" | cut -c1-45}${font}
+${color #C0C0C0}DNS: ${color #FFFFFF}${execi 60 cat /etc/resolv.conf | cut -c12-}${font}
+${color #C0C0C0}WAN: ${color #FFFFFF}${execi 300 curl -s https://ifconfig.me}${font}
+
+${color #C0C0C0}Outgoing: ${color #FFFFFF}${tcp_portmon 32767 
+65535 count}${alignr}${color #C0C0C0}Incoming: ${color #FFFFFF}${tcp_portmon 1 32768 count}
+
+${color #C0C0C0}HOST: ${alignr} PORT:$color
+${color #FFFFFF}${tcp_portmon 32768 65535 rip 0} ${alignr} ${tcp_portmon 32768 65535 lservice 0}
+${color #FFFFFF}${tcp_portmon 32768 65535 rip 1} ${alignr} ${tcp_portmon 32768 65535 lservice 1}
+${color #FFFFFF}${tcp_portmon 32768 65535 rip 2} ${alignr} ${tcp_portmon 32768 65535 lservice 2}
+
+${color #FFFFFF}${tcp_portmon 1 32767 rip 0} ${alignr} ${tcp_portmon 1 32767 lservice 0}
+]]
+CONKYEOF
+
+# Sustituir los marcadores por los valores reales detectados y adaptar a Arch
+# (reemplazo de texto literal en Python para no pelear con sed y los $ de Conky).
+python3 << PYEOF
 import os
-path = os.path.expanduser("~/.conky/SystemMon/conky-sysinfo4")
+path = os.path.expanduser("~/.conky/conkyrc")
 with open(path, "r") as f:
     content = f.read()
 
-replacements = {
-    '${execi 999999 lsb_release -ds}': '''${execi 999999 awk -F'"' '/PRETTY_NAME/{print $2}' /etc/os-release}''',
-    '${exec aptitude --version | head -n 1}': '${execi 999999 pacman -Q pacman}',
-    '${execi 3600 aptitude search "~U" | wc -l | tail}': '${execi 3600 checkupdates 2>/dev/null | wc -l}',
-    '${execi 900 dpkg -l | grep -c ^i}': '${execi 900 pacman -Q | wc -l}',
-    '''${execi 45 sudo ufw status | grep -i Status | awk '{print $2}'}''': '${execi 45 systemctl is-active ufw}',
-}
+ncores = os.cpu_count() or 1
+if ncores >= 2:
+    cpu1_block = (
+        '\${color #C0C0C0}CPU1: \${color #FFFFFF}\${cpu cpu1}% \$alignr '
+        '\${exec awk \'/cpu MHz/{i++}i==1{printf "%.f",\$4; exit}\' /proc/cpuinfo}MHz    '
+        '\${hwmon 0 temp 3}°C\n\${cpubar cpu1 12, 200}\n\${color #C0C0C0}\${cpugraph cpu1 12, 200}'
+    )
+else:
+    cpu1_block = ""
 
+replacements = {
+    "__OS_INFO__": '''\${execi 999999 awk -F'"' '/PRETTY_NAME/{print \$2}' /etc/os-release}''',
+    "__CPU1_BLOCK__": cpu1_block,
+    "__ROOTDEV__": "$CONKY_ROOT_DEV",
+    "__IFACE__": "$CONKY_IFACE",
+}
 for old, new in replacements.items():
     content = content.replace(old, new)
 
@@ -439,35 +542,26 @@ with open(path, "w") as f:
     f.write(content)
 PYEOF
 
-    mkdir -p "$HOME/.fonts"
-    cp "$HOME/.conky/SystemMon/Fonts/"* "$HOME/.fonts/" 2>/dev/null || true
-    fc-cache -f "$HOME/.fonts" > /dev/null 2>&1 || true
-
-    rm -rf /tmp/systemmon.zip /tmp/systemmon_extract
-
-    tee "$HOME/.conky/start-sysinfo.sh" > /dev/null << 'CONKYEOF'
+tee "$HOME/.conky/start-conky.sh" > /dev/null << 'STARTEOF'
 #!/usr/bin/env bash
 sleep 5
 killall conky 2>/dev/null || true
-cd "$HOME/.conky/SystemMon" || exit 1
-conky -c "$HOME/.conky/SystemMon/conky-sysinfo4"
-CONKYEOF
-    chmod +x "$HOME/.conky/start-sysinfo.sh"
+conky -c "$HOME/.conky/conkyrc"
+STARTEOF
+chmod +x "$HOME/.conky/start-conky.sh"
 
-    mkdir -p "$HOME/.config/autostart"
-    tee "$HOME/.config/autostart/systemmon-conky.desktop" > /dev/null << EOF
+mkdir -p "$HOME/.config/autostart"
+rm -f "$HOME/.config/autostart/systemmon-conky.desktop"
+tee "$HOME/.config/autostart/conky.desktop" > /dev/null << EOF
 [Desktop Entry]
 Type=Application
-Name=SystemMon Conky
+Name=Conky
 Comment=Widget de monitoreo de sistema en el escritorio
-Exec=$HOME/.conky/start-sysinfo.sh
+Exec=$HOME/.conky/start-conky.sh
 Icon=utilities-system-monitor
 Terminal=false
 X-GNOME-Autostart-enabled=true
 EOF
-else
-    echo "   - No se pudo descargar SystemMon (sin conexión?), se omite."
-fi
 
 echo "==> Configurando transparencia en MATE Terminal..."
 dconf write /org/mate/terminal/profiles/default/background-type "'transparent'"
