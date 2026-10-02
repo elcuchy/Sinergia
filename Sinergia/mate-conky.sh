@@ -419,6 +419,9 @@ CONKY_IFACE=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
 [ -z "$CONKY_IFACE" ] && CONKY_IFACE=$(ip -br link show up 2>/dev/null | awk '$1!="lo"{print $1; exit}')
 [ -z "$CONKY_IFACE" ] && CONKY_IFACE="eth0"
 
+CONKY_FSTYPE=$(findmnt -no FSTYPE / 2>/dev/null | tr '[:lower:]' '[:upper:]')
+[ -z "$CONKY_FSTYPE" ] && CONKY_FSTYPE="ROOT"
+
 tee "$HOME/.conky/conkyrc" > /dev/null << 'CONKYEOF'
 -- vim: ts=4 sw=4 noet ai cindent syntax=lua
 conky.config = {
@@ -485,7 +488,7 @@ ${color #C0C0C0}SWAP: ${color #FFFFFF}$swapperc%${alignr}$swap / $swapmax
 ${color #FFFFFF}${swapbar 12, 200}
 ${color #C0C0C0}${diskiograph __ROOTDEV__ 12, 200}
 
-${color #C0C0C0}EXT4: ${color #FFFFFF}${fs_used_perc /}%  ${fs_used /} /${alignr}${fs_size /}
+${color #C0C0C0}__FSTYPE__: ${color #FFFFFF}${fs_used_perc /}%  ${fs_used /} /${alignr}${fs_size /}
 ${fs_bar 12, 200 /}
 ${color #C0C0C0}${diskiograph __ROOTDEV__ 12, 200}
 
@@ -534,6 +537,7 @@ replacements = {
     "__CPU1_BLOCK__": cpu1_block,
     "__ROOTDEV__": "$CONKY_ROOT_DEV",
     "__IFACE__": "$CONKY_IFACE",
+    "__FSTYPE__": "$CONKY_FSTYPE",
 }
 for old, new in replacements.items():
     content = content.replace(old, new)
