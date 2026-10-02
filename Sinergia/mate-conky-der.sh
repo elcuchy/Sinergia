@@ -192,6 +192,7 @@ sudo pacman -S --noconfirm \
   unzip \
   ufw \
   pacman-contrib \
+  ttf-monofur \
   gnome-boxes \
   os-prober
 
