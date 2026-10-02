@@ -1,0 +1,554 @@
+#!/bin/bash
+
+# ==========================================
+# 1. CONFIGURACIÓN DE RESPALDO Y PACMAN
+# ==========================================
+if [ ! -f /etc/pacman.conf.bak_repos ]; then
+    echo "==> Creando respaldo de /etc/pacman.conf..."
+    sudo cp /etc/pacman.conf /etc/pacman.conf.bak_repos
+fi
+
+# Si una corrida anterior se cortó a mitad de camino, pacman.conf puede haber
+# quedado con un Include apuntando a un mirrorlist que nunca se llegó a crear.
+# Esto rompe pacman por completo, asi que lo detectamos y corregimos antes de seguir.
+echo "==> Verificando integridad de pacman.conf..."
+if grep -q "^Include = /etc/pacman.d/kiro-mirrorlist" /etc/pacman.conf && [ ! -f /etc/pacman.d/kiro-mirrorlist ]; then
+    echo "   - kiro-mirrorlist roto (no existe el archivo), revirtiendo a Server= temporal..."
+    sudo sed -i 's|^Include = /etc/pacman.d/kiro-mirrorlist|Server = https://erikdubois.github.io/$repo/$arch|' /etc/pacman.conf
+fi
+if grep -q "^Include = /etc/pacman.d/chaotic-mirrorlist" /etc/pacman.conf && [ ! -f /etc/pacman.d/chaotic-mirrorlist ]; then
+    echo "   - chaotic-mirrorlist roto (no existe el archivo), eliminando la sección para recrearla..."
+    sudo sed -i '/^\[chaotic-aur\]$/,/^Include = \/etc\/pacman.d\/chaotic-mirrorlist$/d' /etc/pacman.conf
+fi
+
+# Agregar ILoveCandy y habilitar ParallelDownloads si no existen (CORREGIDO)
+echo "==> Activando ILoveCandy y descargas paralelas en pacman.conf..."
+if ! grep -q "^ILoveCandy" /etc/pacman.conf; then
+    # Inserta ILoveCandy justo debajo de la cabecera [options]
+    sudo sed -i '/^\[options\]/a ILoveCandy' /etc/pacman.conf
+fi
+
+if grep -q "^#ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i 's/^#ParallelDownloads/ParallelDownloads/g' /etc/pacman.conf
+elif ! grep -q "^ParallelDownloads" /etc/pacman.conf; then
+    sudo sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
+fi
+
+
+# ==========================================
+# 1.1 CONFIGURACIÓN DEL REPOSITORIO MULTILIB
+# ==========================================
+echo "==> Verificando repositorio multilib..."
+
+if grep -q "^\[multilib\]" /etc/pacman.conf; then
+    echo "==> El repositorio multilib ya está habilitado."
+elif grep -q "^#\[multilib\]" /etc/pacman.conf; then
+    echo "==> Habilitando repositorio multilib (estaba comentado)..."
+    sudo sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+else
+    echo "==> Agregando repositorio multilib (no existía en el archivo)..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[multilib]
+Include = /etc/pacman.d/mirrorlist
+EOF'
+fi
+
+sudo pacman -Sy
+
+
+# ==========================================
+# 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
+# ==========================================
+echo "==> Configurando el repositorio nemesis_repo..."
+
+if ! grep -q "\[nemesis_repo\]" /etc/pacman.conf; then
+    echo "==> Agregando repositorio temporal nemesis_repo para bootstrap..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[nemesis_repo]
+Server = https://erikdubois.github.io/\$repo/\$arch
+EOF'
+fi
+
+sudo pacman -Sy
+
+echo "==> Importando clave PGP de Kiro (149ABD0C3A0563EE)..."
+sudo pacman-key --recv-keys 149ABD0C3A0563EE --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-keys 149ABD0C3A0563EE --keyserver keys.openpgp.org
+
+sudo pacman-key --lsign-key 149ABD0C3A0563EE
+
+echo "==> Instalando kiro-keyring y kiro-mirrorlist..."
+sudo pacman -Sy --needed kiro-keyring kiro-mirrorlist --noconfirm
+
+if [ ! -f /etc/pacman.d/kiro-mirrorlist ]; then
+    echo "==> ERROR: kiro-mirrorlist no se instaló (probable falla de red temporal)."
+    echo "    No se va a tocar pacman.conf para evitar dejarlo roto. Corré el script de nuevo."
+    exit 1
+fi
+
+echo "==> Actualizando pacman.conf para usar kiro-mirrorlist..."
+sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /etc/pacman.d/kiro-mirrorlist|g' /etc/pacman.conf
+
+
+# ==========================================
+# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# ==========================================
+echo "==> Configurando el repositorio Chaotic-AUR..."
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
+sudo pacman-key --lsign-key 3056513887B78AEB
+
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+
+if [ ! -f /etc/pacman.d/chaotic-mirrorlist ]; then
+    echo "==> ERROR: chaotic-mirrorlist no se instaló (probable falla de red temporal)."
+    echo "    No se va a tocar pacman.conf para evitar dejarlo roto. Corré el script de nuevo."
+    exit 1
+fi
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF'
+fi
+
+echo "==> Actualizando la base de datos de repositorios..."
+sudo pacman -Sy
+
+
+# Exit on error (si un comando falla, el script se detiene por seguridad)
+set -e
+
+
+# 4. Instalar xfce y el resto de los paquetes
+sudo pacman -S --noconfirm \
+  xorg-server \
+  xorg-apps \
+  mate \
+  mate-extra \
+  mate-tweak \
+  mate-themes \
+  mate-icon-theme-faenza \
+  brisk-menu \
+  mate-applet-dock \
+  plank \
+  synapse \
+  vala-panel-appmenu-mate \
+  mate-netbook \
+  python-gobject \
+  dbus \
+  lightdm \
+  lightdm-gtk-greeter \
+  lightdm-slick-greeter \
+  pipewire-pulse \
+  wireplumber \
+  pavucontrol \
+  network-manager-applet \
+  amd-ucode \
+  intel-ucode \
+  vlc \
+  unrar \
+  p7zip \
+  firefox \
+  firefox-i18n-es-ar \
+  libreoffice-fresh-es \
+  hunspell-es_uy \
+  telegram-desktop \
+  zsh \
+  zsh-completions \
+  fastfetch \
+  ntfs-3g \
+  archlinux-tweak-tool-gtk4 \
+  terminology \
+  vlc-plugins-all \
+  hardinfo2 \
+  mpv \
+  btop \
+  gparted \
+  nano \
+  audacious \
+  shelly \
+  obs-studio \
+  audacity \
+  ardour \
+  kdenlive \
+  ventoy \
+  papirus-icon-theme \
+  mint-l-icons \
+  mint-x-icons \
+  mint-y-icons \
+  mate-icon-theme-faenza \
+  rustdesk-bin \
+  transmission-gtk \
+  gnome-boxes \
+  os-prober
+
+# ==========================================
+# . INSTALACIÓN DE YAY Y PAQUETES AUR
+# ==========================================
+echo "==> Asegurando base-devel e instalando YAY..."
+sudo pacman -S --needed base-devel git --noconfirm
+
+rm -rf yay
+git clone https://aur.archlinux.org/yay.git
+cd yay || exit
+makepkg -si --noconfirm
+cd ..
+rm -rf yay
+
+echo "==> Instalando paquetes adicionales..."
+yay -S stacer-bin mate-menu sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
+
+# ==========================================
+# 4.1 PERFILES DE PANEL PARA MATE-TWEAK
+#     (Cupertino, Redmond, Mutiny, Netbook, etc.)
+# ==========================================
+echo "==> Instalando layouts de panel adicionales para mate-tweak..."
+sudo mkdir -p /usr/share/mate-panel/layouts
+LAYOUTS_BASE="https://raw.githubusercontent.com/ubuntu-mate/ubuntu-mate-settings/master/usr/share/mate-panel/layouts"
+for f in eleven.layout eleven.dock redmond.layout mutiny.layout mutiny.dock \
+         netbook.layout contemporary.layout familiar.layout pantheon.layout \
+         pantheon.dock ubuntu-mate.layout; do
+    if sudo curl -fsSL "$LAYOUTS_BASE/$f" -o "/usr/share/mate-panel/layouts/$f"; then
+        echo "   - $f OK"
+    else
+        echo "   - $f no se pudo descargar, se omite"
+        sudo rm -f "/usr/share/mate-panel/layouts/$f"
+    fi
+done
+# Nota: dentro de mate-tweak, Cupertino aparece internamente como "eleven".
+
+echo "==> Generando layout propio para el perfil Manjaro..."
+sudo tee /usr/share/mate-panel/layouts/manjaro.layout > /dev/null << 'LAYOUTEOF'
+[Toplevel bottom]
+expand=true
+orientation=bottom
+size=28
+
+[Object briskmenu]
+object-type=applet
+applet-iid=BriskMenuFactory::BriskMenu
+toplevel-id=bottom
+position=0
+locked=true
+
+[Object showdesktopapplet]
+locked=true
+position=10
+toplevel-id=bottom
+applet-iid=WnckletFactory::ShowDesktopApplet
+object-type=applet
+
+[Object window-list]
+object-type=applet
+applet-iid=WnckletFactory::WindowListApplet
+toplevel-id=bottom
+position=20
+locked=true
+
+[Object workspace-switcher]
+object-type=applet
+applet-iid=WnckletFactory::WorkspaceSwitcherApplet
+toplevel-id=bottom
+position=10
+relative-to-edge=end
+locked=true
+
+[Object drivemountapplet]
+object-type=applet
+applet-iid=DriveMountAppletFactory::DriveMountApplet
+toplevel-id=bottom
+position=30
+relative-to-edge=end
+locked=true
+
+[Object notification-area]
+object-type=applet
+applet-iid=NotificationAreaAppletFactory::NotificationArea
+toplevel-id=bottom
+position=20
+relative-to-edge=end
+locked=true
+
+[Object indicatorappletcomplete]
+object-type=applet
+applet-iid=IndicatorAppletCompleteFactory::IndicatorAppletComplete
+toplevel-id=bottom
+position=0
+relative-to-edge=end
+locked=true
+LAYOUTEOF
+
+echo "==> Personalizando layout del perfil Pantheon (menu izq. / synapse+red+reloj der.)..."
+sudo tee /usr/share/mate-panel/layouts/pantheon.layout > /dev/null << 'LAYOUTEOF'
+[Toplevel top]
+expand=true
+orientation=top
+size=28
+
+[Object briskmenu]
+object-type=applet
+applet-iid=BriskMenuFactory::BriskMenu
+toplevel-id=top
+position=0
+locked=true
+
+[Object notification-area]
+object-type=applet
+applet-iid=NotificationAreaAppletFactory::NotificationArea
+toplevel-id=top
+position=20
+panel-right-stick=true
+locked=true
+
+[Object clock]
+object-type=applet
+applet-iid=ClockAppletFactory::ClockApplet
+toplevel-id=top
+position=10
+panel-right-stick=true
+locked=true
+LAYOUTEOF
+
+echo "==> Creando script central para cambiar de layout (panel + dock)..."
+sudo tee /usr/local/bin/set-panel-layout > /dev/null << 'HELPEREOF'
+#!/bin/bash
+# Uso: set-panel-layout <nombre-de-layout>
+layout="$1"
+[ -z "$layout" ] && { echo "Uso: set-panel-layout <layout>"; exit 1; }
+
+killall mate-panel 2>/dev/null
+dconf reset -f /org/mate/panel/
+mate-panel --reset --layout "$layout"
+
+# mate-panel a veces duplica las entradas de object-id-list al resetear,
+# y algunos applets (como el menu) se registran tarde via D-Bus.
+# Reintenta la deduplicacion varias veces para agarrar tambien esos casos.
+for i in 1 2 3; do
+    sleep 1
+    ids=$(dconf read /org/mate/panel/general/object-id-list 2>/dev/null)
+    if [ -n "$ids" ]; then
+        dedup=$(python3 -c "
+import ast
+lst = ast.literal_eval('''$ids''')
+seen = []
+for x in lst:
+    if x not in seen:
+        seen.append(x)
+print(seen)
+" 2>/dev/null)
+        [ -n "$dedup" ] && dconf write /org/mate/panel/general/object-id-list "$dedup"
+    fi
+done
+
+dockfile="/usr/share/mate-panel/layouts/${layout}.dock"
+if [ -s "$dockfile" ]; then
+    dockapp=$(tr -d '[:space:]' < "$dockfile")
+    dconf write /org/mate/desktop/session/required-components/dock "'${dockapp}'"
+    killall "$dockapp" 2>/dev/null
+    nohup "$dockapp" >/dev/null 2>&1 &
+else
+    dconf write /org/mate/desktop/session/required-components/dock "''"
+    killall plank 2>/dev/null
+fi
+HELPEREOF
+sudo chmod +x /usr/local/bin/set-panel-layout
+
+# ==========================================
+# 4.2 APARIENCIA Y VALORES POR DEFECTO
+#     (tema, iconos, fondo, perfil de panel, synapse)
+# ==========================================
+echo "==> Generando tema de íconos con el logo de Arch para el menú..."
+sudo mkdir -p /usr/share/icons/Mint-Y-Yaru-Arch/scalable/places
+sudo tee /usr/share/icons/Mint-Y-Yaru-Arch/index.theme > /dev/null << 'THEMEEOF'
+[Icon Theme]
+Name=Mint-Y-Yaru-Arch
+Comment=Mint-Y-Yaru con el logo de Arch Linux en el menu
+Inherits=Mint-Y-Yaru
+Directories=scalable/places
+
+[scalable/places]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Places
+THEMEEOF
+sudo cp /usr/share/pixmaps/archlinux-logo.svg /usr/share/icons/Mint-Y-Yaru-Arch/scalable/places/start-here.svg
+
+echo "==> Configurando lanzadores por defecto de Plank (evita que se auto-siembre roto)..."
+# /etc/skel NO sirve aca: la cuenta del usuario ya existe (se crea durante la
+# instalacion base de Arch, antes de este script), asi que hay que aplicar el
+# fix directo sobre su carpeta real, igual que a cualquier cuenta ya creada.
+killall plank 2>/dev/null
+chattr -i "$HOME/.config/plank/dock1/launchers/" 2>/dev/null
+rm -rf "$HOME/.config/plank/dock1/launchers"
+mkdir -p "$HOME/.config/plank/dock1/launchers"
+tee "$HOME/.config/plank/dock1/launchers/matecc.dockitem" > /dev/null << 'EOF'
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/matecc.desktop
+EOF
+chattr +i "$HOME/.config/plank/dock1/launchers/" 2>/dev/null || echo "   - chattr no soportado en este filesystem, se omite la protección"
+
+echo "==> Evitando menú duplicado de LibreOffice con el menú global (vala-panel-appmenu)..."
+if ! grep -q "^SAL_USE_VCLPLUGIN=" /etc/environment 2>/dev/null; then
+    echo "SAL_USE_VCLPLUGIN=gen" | sudo tee -a /etc/environment > /dev/null
+fi
+
+echo "==> Descargando fondo de pantalla por defecto..."
+sudo mkdir -p /usr/share/backgrounds
+sudo curl -fsSL "https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/11.png" \
+    -o /usr/share/backgrounds/archlinux-wallpaper.png
+
+echo "==> Configurando valores por defecto de MATE (dconf)..."
+sudo mkdir -p /etc/dconf/profile
+sudo tee /etc/dconf/profile/user > /dev/null << 'PROFILEEOF'
+user-db:user
+system-db:local
+PROFILEEOF
+
+sudo mkdir -p /etc/dconf/db/local.d
+sudo tee /etc/dconf/db/local.d/01-mate-defaults > /dev/null << 'DCONFEOF'
+[org/mate/desktop/background]
+picture-filename='/usr/share/backgrounds/archlinux-wallpaper.png'
+picture-options='zoom'
+
+[org/mate/desktop/interface]
+gtk-theme='BlackMATE'
+icon-theme='Mint-Y-Yaru-Arch'
+
+[org/mate/marco/general]
+theme='BlackMATE'
+
+[org/mate/panel/general]
+default-layout='pantheon'
+
+[org/mate/desktop/session/required-components]
+dock='plank'
+DCONFEOF
+sudo dconf update
+
+echo "==> Configurando lightdm-slick-greeter como pantalla de inicio de sesión..."
+sudo mkdir -p /etc/lightdm/lightdm.conf.d
+sudo tee /etc/lightdm/lightdm.conf.d/90-greeter.conf > /dev/null << 'GREETEREOF'
+[Seat:*]
+greeter-session=lightdm-slick-greeter
+GREETEREOF
+
+sudo mkdir -p /etc/lightdm
+sudo tee /etc/lightdm/slick-greeter.conf > /dev/null << 'SLICKEOF'
+[Greeter]
+background=/usr/share/backgrounds/archlinux-wallpaper.png
+theme-name=BlackMATE
+icon-theme-name=Mint-Y-Yaru-Arch
+SLICKEOF
+
+echo "==> Configurando Synapse para iniciar junto con la sesión..."
+if [ -f /usr/share/applications/synapse.desktop ]; then
+    sudo mkdir -p /etc/xdg/autostart
+    sudo cp /usr/share/applications/synapse.desktop /etc/xdg/autostart/synapse.desktop
+    sudo sed -i '/^X-GNOME-Autostart-enabled/d' /etc/xdg/autostart/synapse.desktop
+    echo "X-GNOME-Autostart-enabled=true" | sudo tee -a /etc/xdg/autostart/synapse.desktop > /dev/null
+else
+    echo "   - No se encontró synapse.desktop, se omite el autostart."
+fi
+
+echo "==> Configurando autostart del dock (Plank) según el perfil de panel..."
+sudo tee /usr/local/bin/dock-autostart > /dev/null << 'DOCKEOF'
+#!/bin/bash
+dock=$(dconf read /org/mate/desktop/session/required-components/dock 2>/dev/null | tr -d "'")
+[ -n "$dock" ] && exec "$dock"
+DOCKEOF
+sudo chmod +x /usr/local/bin/dock-autostart
+
+sudo mkdir -p /etc/xdg/autostart
+sudo tee /etc/xdg/autostart/dock-autostart.desktop > /dev/null << 'DESKEOF'
+[Desktop Entry]
+Type=Application
+Name=Dock Autostart
+Comment=Inicia el dock (ej. Plank) segun el perfil de panel activo
+Exec=/usr/local/bin/dock-autostart
+Icon=plank
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=2
+NoDisplay=true
+DESKEOF
+
+echo "==> Creando lanzadores de perfiles de panel (evitan el filtro de mate-tweak)..."
+sudo mkdir -p /usr/share/applications
+
+declare -A PANEL_LAYOUTS=(
+    ["eleven"]="Perfil de Panel: Cupertino"
+    ["redmond"]="Perfil de Panel: Redmond"
+    ["mutiny"]="Perfil de Panel: Mutiny"
+    ["netbook"]="Perfil de Panel: Netbook"
+    ["contemporary"]="Perfil de Panel: Contemporary"
+    ["pantheon"]="Perfil de Panel: Pantheon"
+    ["manjaro"]="Perfil de Panel: Manjaro"
+)
+
+for layout in "${!PANEL_LAYOUTS[@]}"; do
+    name="${PANEL_LAYOUTS[$layout]}"
+    sudo tee "/usr/share/applications/panel-layout-${layout}.desktop" > /dev/null << EOF
+[Desktop Entry]
+Type=Application
+Name=${name}
+Comment=Cambia el layout del panel de MATE a ${layout}
+Exec=/usr/local/bin/set-panel-layout ${layout}
+Icon=mate-panel
+Terminal=false
+Categories=Settings;DesktopSettings;
+NoDisplay=false
+EOF
+done
+
+# 5. Configurar GRUB para detectar otros sistemas operativos
+sudo sed -i.bak 's/#\?\(GRUB_DISABLE_OS_PROBER=\).*/\1false/' /etc/default/grub
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+# 6. Habilitar el gestor de inicio
+sudo systemctl enable lightdm
+
+# ==========================================
+# 7. LIMPIEZA Y RESUMEN FINAL
+# ==========================================
+rm -rf "$HOME/LinuxScripts"
+
+echo "======================================================"
+echo " Instalación y configuración completadas con éxito."
+echo " Display manager configurado: LightDM (GTK Greeter)"
+echo " Entorno de escritorio: Mate"
+echo " Repositorios habilitados: multilib, chaotic-aur"
+echo " Gestor de paquetes AUR: yay"
+echo " GRUB: os-prober habilitado (detección de otros SO)"
+echo " Respaldo de pacman.conf: /etc/pacman.conf.bak_repos"
+echo "  
+ SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
+S        I    NN  N  E      R   R  G   G    I    A   A
+S        I    N N N  E      R   R  G        I    A   A
+ SSS     I    N N N  EEEE   RRRR   G GGG    I    AAAAA
+    S    I    N  NN  E      R R    G   G    I    A   A
+    S    I    N   N  E      R  R   G   G    I    A   A
+SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
+echo "======================================================"
+echo "            COMUNIDAD    LINUXERA"
+echo "======================================================"
+
+read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
+case "$respuesta" in
+    [sS]|"")
+        echo "==> Reiniciando..."
+        sudo reboot
+        ;;
+    *)
+        echo "==> Reinicio cancelado. Recordá reiniciar manualmente para aplicar los cambios."
+        ;;
+esac
