@@ -214,7 +214,7 @@ fi
 # Tema:   Dimensions (e25) de simotek - https://www.gnome-look.org/p/1795915
 #         (se descarga del release oficial del autor en GitHub)
 # Iconos: Yaru-blue-dark (paquete yaru-icon-theme), habilitado también para Enlightenment
-# Fondo:  archlinux-wallpapers / 30.png
+# Fondo:  archlinux-wallpapers / 27.png (escritorio y pantalla de inicio de sesión)
 #
 # Enlightenment guarda su configuración en archivos binarios (e.cfg). Aquí se
 # modifican los perfiles del SISTEMA, así cada usuario nuevo arranca ya con el
@@ -224,13 +224,13 @@ fi
 E_THEME_TAG="20220516.1.26"
 E_THEME_FILE="Dimensions.edj"
 ICON_THEME="Yaru-blue-dark"
-WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/30.png"
+WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/27.png"
 
 E_THEMES_DIR="/usr/share/enlightenment/data/themes"
 ELM_THEMES_DIR="/usr/share/elementary/themes"
 E_BG_DIR="/usr/share/enlightenment/data/backgrounds"
-WALLPAPER_PNG="/usr/share/backgrounds/comunidad-linuxera/30.png"
-WALLPAPER_EDJ="$E_BG_DIR/linuxera-30.edj"
+WALLPAPER_PNG="/usr/share/backgrounds/comunidad-linuxera/27.png"
+WALLPAPER_EDJ="$E_BG_DIR/linuxera-27.edj"
 LOOK_TMP=$(mktemp -d)
 
 # Fija clave=valor dentro de una [sección] de un archivo .ini (lo edita en el lugar)
@@ -278,19 +278,19 @@ fi
 # Enlightenment no usa PNG directamente como fondo: hay que empaquetarlo en un .edj
 echo "==> Descargando y preparando el fondo de pantalla..."
 BG_OK=0
-if curl -fsSL --retry 3 -o "$LOOK_TMP/30.png" "$WALLPAPER_URL"; then
-    sudo install -Dm644 "$LOOK_TMP/30.png" "$WALLPAPER_PNG"
+if curl -fsSL --retry 3 -o "$LOOK_TMP/27.png" "$WALLPAPER_URL"; then
+    sudo install -Dm644 "$LOOK_TMP/27.png" "$WALLPAPER_PNG"
 
     # Relación de aspecto para que el fondo cubra la pantalla sin deformarse
     ASPECT_LINE=""
-    DIMS=$(file -b "$LOOK_TMP/30.png" | grep -oE '[0-9]+ x [0-9]+' | head -n1 || true)
+    DIMS=$(file -b "$LOOK_TMP/27.png" | grep -oE '[0-9]+ x [0-9]+' | head -n1 || true)
     if [ -n "$DIMS" ]; then
         RATIO=$(echo "$DIMS" | LC_ALL=C awk '{ printf "%.6f", $1 / $3 }')
         ASPECT_LINE="aspect: $RATIO $RATIO; aspect_preference: NONE;"
     fi
 
     cat > "$LOOK_TMP/bg.edc" << EOF
-images { image: "30.png" LOSSY 95; }
+images { image: "27.png" LOSSY 95; }
 collections {
    group { name: "e/desktop/background";
       data { item: "style" "4"; item: "noanimation" "1"; }
@@ -298,7 +298,7 @@ collections {
          part { name: "bg"; type: IMAGE; mouse_events: 0;
             description { state: "default" 0.0;
                $ASPECT_LINE
-               image { normal: "30.png"; scale_hint: STATIC; }
+               image { normal: "27.png"; scale_hint: STATIC; }
             }
          }
       }
@@ -610,7 +610,7 @@ cat << 'EOF'
  Terminal:              Terminology
  Tema:                  Dimensions (Enlightenment + Elementary)
  Iconos:                Yaru-blue-dark (también en Enlightenment)
- Fondo de pantalla:     archlinux-wallpapers 30.png
+ Fondo de pantalla:     archlinux-wallpapers 27.png
  Gestor de archivos:    EFM (integrado en Enlightenment)
  Red:                   ConnMan
  Gestores de paquetes:  pacman, yay, pamac
