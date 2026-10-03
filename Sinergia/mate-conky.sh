@@ -190,9 +190,11 @@ sudo pacman -S --noconfirm \
   conky \
   lm_sensors \
   unzip \
+  xdg-user-dirs \
   ufw \
   pacman-contrib \
   ttf-monofur \
+  xfce4-screenshooter \
   gnome-boxes \
   os-prober
 
@@ -403,6 +405,16 @@ Launcher=file:///usr/share/applications/matecc.desktop
 EOF
 chattr +i "$HOME/.config/plank/dock1/launchers/" 2>/dev/null || echo "   - chattr no soportado en este filesystem, se omite la protección"
 
+echo "==> Ocultando mate-screenshot (cuelga por un conflicto con gvfs/portal; se usa xfce4-screenshooter)..."
+mkdir -p "$HOME/.local/share/applications"
+cp /usr/share/applications/mate-screenshot.desktop "$HOME/.local/share/applications/mate-screenshot.desktop"
+sed -i '/^NoDisplay=/d' "$HOME/.local/share/applications/mate-screenshot.desktop"
+echo "NoDisplay=true" >> "$HOME/.local/share/applications/mate-screenshot.desktop"
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+
+echo "==> Creando carpetas estándar de usuario (Documentos, Imágenes, etc.)..."
+xdg-user-dirs-update
+
 echo "==> Instalando widget de sistema Conky..."
 # Nota: esto se instala en la carpeta personal del usuario que corre el script,
 # igual que el fix de Plank de arriba - no aplica retroactivamente a otras cuentas.
@@ -448,7 +460,8 @@ conky.config = {
     out_to_stderr = false,
     extra_newline = false,
     own_window = true,
-	own_window_transparent = true,
+	own_window_argb_visual = true,
+	own_window_argb_value = 0,
 	own_window_hints = 'undecorated,skip_taskbar,below,skip_pager,sticky',
     stippled_borders = 0,
 	temperature_unit = 'celsius';
