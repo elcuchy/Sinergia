@@ -147,6 +147,7 @@ sudo pacman -S --noconfirm --needed \
   kdenlive \
   ventoy \
   papirus-icon-theme \
+  yaru-icon-theme \
   mint-l-icons \
   mint-x-icons \
   mint-y-icons \
@@ -208,39 +209,529 @@ fi
 
 
 # ==========================================
-# 9. LIMPIEZA Y REINICIO
+# 7. TEMA, ICONOS Y FONDO DE PANTALLA POR DEFECTO
 # ==========================================
-USER_HOME="$HOME"
+# Tema:   Dimensions (e25) de simotek - https://www.gnome-look.org/p/1795915
+#         (se descarga del release oficial del autor en GitHub)
+# Iconos: Yaru-blue-dark (paquete yaru-icon-theme), habilitado también para Enlightenment
+# Fondo:  archlinux-wallpapers / 27.png (escritorio y pantalla de inicio de sesión)
+#
+# Enlightenment guarda su configuración en archivos binarios (e.cfg). Aquí se
+# modifican los perfiles del SISTEMA, así cada usuario nuevo arranca ya con el
+# tema, los iconos y el fondo. Un hook de pacman los vuelve a aplicar cada vez
+# que se actualiza el paquete enlightenment.
 
-echo "==> Limpiando carpeta del script..."
-rm -rf "$USER_HOME/LinuxScripts"
+E_THEME_TAG="20220516.1.26"
+E_THEME_FILE="Dimensions.edj"
+ICON_THEME="Yaru-blue-dark"
+WALLPAPER_URL="https://raw.githubusercontent.com/f4dzN/archlinux-wallpapers/refs/heads/main/wallpapers/27.png"
 
-echo "======================================================"
-echo " Instalación y configuración completadas con éxito."
-echo " Display manager configurado: GDM"
-echo " Entorno de escritorio: GNOME Shell"
-echo " Extensiones: Dash to Dock, Arc Menu, Burn My Windows,"
-echo "              Compiz Magic Lamp, Coverflow Alt-Tab,"
-echo "              Astra Monitor"
-echo " Terminal: Gnome Terminal"
-echo " Gestor de archivos: Nautilus"
-echo " Repositorios activos: kiro (nemesis_repo) + chaotic-aur"
-echo "  
+# Atajos para "Mostrar lanzador Everything" (dejar vacío EVRY_KEY o EVRY_MOUSE_BUTTON para no crear ese atajo)
+# Modificadores (se suman): 0=ninguno 1=Shift 2=Control 4=Alt 8=Super/Windows
+EVRY_KEY="space"          # tecla: Control + Espacio
+EVRY_KEY_MOD=2
+EVRY_MOUSE_BUTTON=3       # botón: 1=izquierdo 2=central 3=derecho (sobre el escritorio)
+EVRY_MOUSE_MOD=0          # clic derecho solo, sin modificador (reemplaza al menú de favoritos)
+
+E_THEMES_DIR="/usr/share/enlightenment/data/themes"
+ELM_THEMES_DIR="/usr/share/elementary/themes"
+E_BG_DIR="/usr/share/enlightenment/data/backgrounds"
+WALLPAPER_PNG="/usr/share/backgrounds/comunidad-linuxera/27.png"
+WALLPAPER_EDJ="$E_BG_DIR/linuxera-27.edj"
+LOOK_TMP=$(mktemp -d)
+
+# Fija clave=valor dentro de una [sección] de un archivo .ini (lo edita en el lugar)
+ini_set() {
+    local file=$1 section=$2 key=$3 value=$4 out
+    out=$(mktemp)
+    awk -v s="[$section]" -v k="$key" -v v="$value" '
+        BEGIN { seen = 0; insec = 0; done = 0 }
+        $0 == s { print; seen = 1; insec = 1; next }
+        /^\[/ { if (insec && !done) { print k "=" v; done = 1 } insec = 0; print; next }
+        insec && index($0, k) == 1 && $0 ~ ("^" k "[ \t]*=") { if (!done) { print k "=" v; done = 1 } next }
+        { print }
+        END { if (!done) { if (!seen) print s; print k "=" v } }' "$file" > "$out"
+    cat "$out" > "$file"
+    rm -f "$out"
+}
+
+# ---------- 7.1 Iconos ----------
+echo "==> Verificando el tema de iconos $ICON_THEME..."
+if [ ! -d "/usr/share/icons/$ICON_THEME" ]; then
+    ICON_ALT=$(find /usr/share/icons -maxdepth 1 -type d -iname "$ICON_THEME" -printf '%f\n' 2>/dev/null | head -n1 || true)
+    if [ -n "$ICON_ALT" ]; then
+        ICON_THEME="$ICON_ALT"
+    else
+        echo "==> Aviso: no se encontró /usr/share/icons/$ICON_THEME (¿se instaló yaru-icon-theme?). Se configura igual."
+    fi
+fi
+
+# ---------- 7.2 Tema Dimensions ----------
+echo "==> Descargando el tema 'Dimensions' para Enlightenment..."
+THEME_OK=0
+THEME_URL=$(curl -fsSL "https://api.github.com/repos/simotek/Enlightenment-Themes/releases/tags/$E_THEME_TAG" 2>/dev/null \
+    | grep -oE 'https://[^"]+\.edj' | grep -E '/Dimensions[^/]*\.edj$' | head -n1 || true)
+
+if [ -n "$THEME_URL" ] && curl -fsSL --retry 3 -o "$LOOK_TMP/$E_THEME_FILE" "$THEME_URL"; then
+    sudo install -Dm644 "$LOOK_TMP/$E_THEME_FILE" "$E_THEMES_DIR/$E_THEME_FILE"
+    # El mismo .edj sirve para las aplicaciones EFL/Elementary
+    sudo install -Dm644 "$LOOK_TMP/$E_THEME_FILE" "$ELM_THEMES_DIR/$E_THEME_FILE"
+    THEME_OK=1
+else
+    echo "==> Aviso: no se pudo descargar el tema Dimensions; Enlightenment usará su tema por defecto."
+fi
+
+# ---------- 7.3 Fondo de pantalla ----------
+# Enlightenment no usa PNG directamente como fondo: hay que empaquetarlo en un .edj
+echo "==> Descargando y preparando el fondo de pantalla..."
+BG_OK=0
+if curl -fsSL --retry 3 -o "$LOOK_TMP/27.png" "$WALLPAPER_URL"; then
+    sudo install -Dm644 "$LOOK_TMP/27.png" "$WALLPAPER_PNG"
+
+    # Relación de aspecto para que el fondo cubra la pantalla sin deformarse
+    ASPECT_LINE=""
+    DIMS=$(file -b "$LOOK_TMP/27.png" | grep -oE '[0-9]+ x [0-9]+' | head -n1 || true)
+    if [ -n "$DIMS" ]; then
+        RATIO=$(echo "$DIMS" | LC_ALL=C awk '{ printf "%.6f", $1 / $3 }')
+        ASPECT_LINE="aspect: $RATIO $RATIO; aspect_preference: NONE;"
+    fi
+
+    cat > "$LOOK_TMP/bg.edc" << EOF
+images { image: "27.png" LOSSY 95; }
+collections {
+   group { name: "e/desktop/background";
+      data { item: "style" "4"; item: "noanimation" "1"; }
+      parts {
+         part { name: "bg"; type: IMAGE; mouse_events: 0;
+            description { state: "default" 0.0;
+               $ASPECT_LINE
+               image { normal: "27.png"; scale_hint: STATIC; }
+            }
+         }
+      }
+   }
+}
+EOF
+    if edje_cc -id "$LOOK_TMP" "$LOOK_TMP/bg.edc" "$LOOK_TMP/bg.edj" >/dev/null 2>&1; then
+        sudo install -Dm644 "$LOOK_TMP/bg.edj" "$WALLPAPER_EDJ"
+        BG_OK=1
+    else
+        echo "==> Aviso: edje_cc no pudo generar el fondo .edj; se mantiene el fondo por defecto."
+    fi
+else
+    echo "==> Aviso: no se pudo descargar el fondo de pantalla."
+fi
+
+# ---------- 7.4 Configuración por defecto de Enlightenment ----------
+echo "==> Guardando la configuración de apariencia en /etc/linuxera-look.conf..."
+CONF_THEME=""
+CONF_BG=""
+if [ "$THEME_OK" -eq 1 ]; then CONF_THEME="$E_THEME_FILE"; fi
+if [ "$BG_OK" -eq 1 ]; then CONF_BG="$WALLPAPER_EDJ"; fi
+
+sudo tee /etc/linuxera-look.conf > /dev/null << EOF
+# Apariencia por defecto de Enlightenment - COMUNIDAD LINUXERA
+# Usado por /usr/local/bin/linuxera-e-look (vacío = no se modifica)
+E_THEME="$CONF_THEME"
+ICON_THEME="$ICON_THEME"
+WALLPAPER_EDJ="$CONF_BG"
+# Atajos del lanzador Everything. Modificadores: 1=Shift 2=Control 4=Alt 8=Super (se suman)
+EVRY_KEY="$EVRY_KEY"
+EVRY_KEY_MOD="$EVRY_KEY_MOD"
+# Botón del mouse sobre el escritorio: 1=izquierdo 2=central 3=derecho
+EVRY_MOUSE_BUTTON="$EVRY_MOUSE_BUTTON"
+EVRY_MOUSE_MOD="$EVRY_MOUSE_MOD"
+EOF
+
+echo "==> Instalando la herramienta linuxera-e-look..."
+sudo tee /usr/local/bin/linuxera-e-look > /dev/null << 'HELPER_EOF'
+#!/bin/bash
+# linuxera-e-look - COMUNIDAD LINUXERA
+# Aplica tema, iconos (habilitados para Enlightenment), fondo y atajos del lanzador Everything.
+#   linuxera-e-look          -> perfiles del sistema (como root; lo usa el hook de pacman)
+#   linuxera-e-look --user   -> configuración del usuario actual (~/.e/e), con Enlightenment cerrado
+set -uo pipefail
+
+CONF=/etc/linuxera-look.conf
+log() { echo "==> [linuxera-e-look] $*"; }
+
+[ -r "$CONF" ] || { log "No existe $CONF"; exit 1; }
+# shellcheck source=/dev/null
+. "$CONF"
+command -v eet > /dev/null 2>&1 || { log "Falta el comando eet (paquete efl)."; exit 1; }
+
+# Fija el valor de 'value "clave" tipo: valor;' en el bloque principal (E_Config o Elm_Config).
+# Si la clave ya existe se respeta su tipo; si no existe se agrega (salvo modo "solo-si-existe").
+set_value() {
+    local src=$1 key=$2 type=$3 val=$4 mode=${5:-} valtxt tmp
+    if [ "$type" = "string" ]; then valtxt="\"$val\""; else valtxt="$val"; fi
+    tmp=$(mktemp) || return 1
+    if grep -qF "value \"$key\" " "$src"; then
+        awk -v pat="value \"$key\" " -v vt="$valtxt" '
+            index($0, pat) { sub(/:[ \t].*;[ \t]*$/, ": " vt ";") }
+            { print }' "$src" > "$tmp"
+    elif [ "$mode" = "solo-si-existe" ]; then
+        rm -f "$tmp"; return 0
+    else
+        awk -v line="  value \"$key\" $type: $valtxt;" '
+            !done && /^group "[^"]+" struct/ { print; print line; done = 1; next }
+            { print }' "$src" > "$tmp"
+    fi
+    mv "$tmp" "$src"
+}
+
+# Fija el tema principal (entrada E_Config_Theme con category "theme")
+set_theme() {
+    local src=$1 theme=$2 tmp rc block
+    tmp=$(mktemp) || return 1
+    awk -v theme="$theme" '
+        function flush(   i) {
+            for (i = 1; i <= n; i++) {
+                if (is_theme && buf[i] ~ /value "file" string:/)
+                    sub(/string: ".*";/, "string: \"" theme "\";", buf[i])
+                print buf[i]
+            }
+            n = 0; inblk = 0; is_theme = 0
+        }
+        /group "E_Config_Theme" struct/ { inblk = 1; n = 0 }
+        inblk {
+            buf[++n] = $0
+            if ($0 ~ /value "category" string: "theme";/) { is_theme = 1; found = 1 }
+            if ($0 ~ /^[ \t]*}[ \t]*$/) flush()
+            next
+        }
+        { print }
+        END { if (n) flush(); exit (found ? 0 : 3) }' "$src" > "$tmp"
+    rc=$?
+    if [ "$rc" -eq 3 ]; then
+        block='group "E_Config_Theme" struct {\n      value "category" string: "theme";\n      value "file" string: "'"$theme"'";\n    }'
+        if grep -q 'group "themes" list' "$tmp"; then
+            awk -v b="    $block" '!done && /group "themes" list/ { print; print b; done = 1; next } { print }' "$tmp" > "$tmp.2"
+        else
+            awk -v b="  group \"themes\" list {\n    $block\n  }" '!done && /^group "E_Config" struct/ { print; print b; done = 1; next } { print }' "$tmp" > "$tmp.2"
+        fi
+        mv "$tmp.2" "$tmp"
+        rc=0
+    fi
+    if [ "$rc" -eq 0 ]; then mv "$tmp" "$src"; else rm -f "$tmp"; return 1; fi
+}
+
+# Agrega un atajo a una lista de e_bindings.cfg (key_bindings / mouse_bindings).
+# Antes quita cualquier atajo existente con la misma combinación (líneas de $match, separadas por "|").
+set_binding() {
+    local src=$1 list=$2 struct=$3 match=$4 block=$5 tmp rc
+    tmp=$(mktemp) || return 1
+    awk -v list="group \"$list\" list" -v st="group \"$struct\" struct" -v m="$match" -v b="$block" '
+        BEGIN { nm = split(m, want, "|") }
+        function flush(   i, j, hit, all) {
+            all = 1
+            for (j = 1; j <= nm; j++) {
+                hit = 0
+                for (i = 1; i <= n; i++) if (index(buf[i], want[j])) { hit = 1; break }
+                if (!hit) { all = 0; break }
+            }
+            if (!all) for (i = 1; i <= n; i++) print buf[i]
+            n = 0; inblk = 0
+        }
+        inblk { buf[++n] = $0; if ($0 ~ /^[ \t]*}[ \t]*$/) flush(); next }
+        index($0, st) { inblk = 1; n = 0; buf[++n] = $0; next }
+        index($0, list) { print; if (!done) { print b; done = 1 } next }
+        { print }
+        END { if (n) flush(); exit (done ? 0 : 3) }' "$src" > "$tmp"
+    rc=$?
+    if [ "$rc" -eq 3 ]; then
+        # La lista no existe todavía: se crea dentro del bloque principal
+        awk -v b="  group \"$list\" list {\n$block\n  }" '
+            !done && /^group "[^"]+" struct/ { print; print b; done = 1; next }
+            { print }' "$tmp" > "$tmp.2"
+        mv "$tmp.2" "$tmp"
+        rc=0
+    fi
+    if [ "$rc" -eq 0 ]; then mv "$tmp" "$src"; else rm -f "$tmp"; return 1; fi
+}
+
+patch_cfg() {
+    local cfg=$1 work ok=1
+    work=$(mktemp -d) || return 1
+    if ! eet -d "$cfg" config "$work/e.src" > /dev/null 2>&1; then
+        log "No se pudo decodificar $cfg"; rm -rf "$work"; return 1
+    fi
+    if [ -n "${ICON_THEME:-}" ]; then
+        set_value "$work/e.src" icon_theme string "$ICON_THEME" || ok=0
+        # "Habilitar tema de iconos para Enlightenment"
+        set_value "$work/e.src" icon_theme_overrides uchar 1 || ok=0
+        # Pasar el mismo tema de iconos a las aplicaciones GTK vía xsettings
+        set_value "$work/e.src" xsettings.match_e17_icon_theme uchar 1 solo-si-existe || ok=0
+    fi
+    if [ -n "${WALLPAPER_EDJ:-}" ] && [ -f "$WALLPAPER_EDJ" ]; then
+        set_value "$work/e.src" desktop_default_background string "$WALLPAPER_EDJ" || ok=0
+    fi
+    if [ -n "${E_THEME:-}" ]; then
+        set_theme "$work/e.src" "$E_THEME" || ok=0
+    fi
+    if [ "$ok" -ne 1 ]; then
+        log "Error editando $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
+    fi
+    cp "$cfg" "$work/e.cfg"
+    if ! eet -e "$work/e.cfg" config "$work/e.src" 1 > /dev/null 2>&1 \
+       || ! eet -d "$work/e.cfg" config "$work/check.src" > /dev/null 2>&1; then
+        log "Error al recodificar $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
+    fi
+    [ -f "$cfg.linuxera.bak" ] || cp -p "$cfg" "$cfg.linuxera.bak"
+    cat "$work/e.cfg" > "$cfg"
+    rm -rf "$work"
+}
+
+# En las versiones actuales de Enlightenment, el tema y los iconos del menú y
+# de la barra (iBar) salen de la configuración de Elementary (base.cfg), no de e.cfg.
+patch_elm_cfg() {
+    local cfg=$1 work ok=1
+    [ -n "${E_THEME:-}" ] || [ -n "${ICON_THEME:-}" ] || return 0
+    work=$(mktemp -d) || return 1
+    if ! eet -d "$cfg" config "$work/base.src" > /dev/null 2>&1; then
+        log "No se pudo decodificar $cfg"; rm -rf "$work"; return 1
+    fi
+    if [ -n "${E_THEME:-}" ]; then
+        set_value "$work/base.src" theme string "${E_THEME%.edj}" || ok=0
+    fi
+    if [ -n "${ICON_THEME:-}" ]; then
+        # Reemplaza los iconos internos de Elementary por el tema de iconos elegido
+        set_value "$work/base.src" icon_theme string "$ICON_THEME" || ok=0
+    fi
+    if [ "$ok" -ne 1 ]; then
+        log "Error editando $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
+    fi
+    cp "$cfg" "$work/base.cfg"
+    if ! eet -e "$work/base.cfg" config "$work/base.src" 1 > /dev/null 2>&1 \
+       || ! eet -d "$work/base.cfg" config "$work/check.src" > /dev/null 2>&1; then
+        log "Error al recodificar $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
+    fi
+    [ -f "$cfg.linuxera.bak" ] || cp -p "$cfg" "$cfg.linuxera.bak"
+    cat "$work/base.cfg" > "$cfg"
+    rm -rf "$work"
+}
+
+# Atajos de teclado y de mouse para "Mostrar lanzador Everything" (e_bindings.cfg)
+patch_bindings() {
+    local cfg=$1 work ok=1 blk
+    [ -n "${EVRY_KEY:-}" ] || [ -n "${EVRY_MOUSE_BUTTON:-}" ] || return 0
+    work=$(mktemp -d) || return 1
+    if ! eet -d "$cfg" config "$work/b.src" > /dev/null 2>&1; then
+        log "No se pudo decodificar $cfg"; rm -rf "$work"; return 1
+    fi
+    if [ -n "${EVRY_KEY:-}" ]; then
+        # context 9 = en cualquier lugar
+        blk='    group "E_Config_Binding_Key" struct {\n      value "context" int: 9;\n      value "modifiers" int: '"${EVRY_KEY_MOD:-0}"';\n      value "key" string: "'"$EVRY_KEY"'";\n      value "action" string: "everything";\n      value "any_mod" uchar: 0;\n    }'
+        set_binding "$work/b.src" key_bindings E_Config_Binding_Key \
+            "value \"modifiers\" int: ${EVRY_KEY_MOD:-0};|value \"key\" string: \"$EVRY_KEY\";" "$blk" || ok=0
+    fi
+    if [ -n "${EVRY_MOUSE_BUTTON:-}" ]; then
+        # context 3 = sobre el escritorio (así no se le quita el clic a las aplicaciones)
+        blk='    group "E_Config_Binding_Mouse" struct {\n      value "context" int: 3;\n      value "modifiers" int: '"${EVRY_MOUSE_MOD:-0}"';\n      value "action" string: "everything";\n      value "button" uchar: '"$EVRY_MOUSE_BUTTON"';\n      value "any_mod" uchar: 0;\n    }'
+        set_binding "$work/b.src" mouse_bindings E_Config_Binding_Mouse \
+            "value \"context\" int: 3;|value \"modifiers\" int: ${EVRY_MOUSE_MOD:-0};|value \"button\" uchar: $EVRY_MOUSE_BUTTON;" "$blk" || ok=0
+    fi
+    if [ "$ok" -ne 1 ]; then
+        log "Error editando $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
+    fi
+    cp "$cfg" "$work/b.cfg"
+    if ! eet -e "$work/b.cfg" config "$work/b.src" 1 > /dev/null 2>&1 \
+       || ! eet -d "$work/b.cfg" config "$work/check.src" > /dev/null 2>&1; then
+        log "Error al recodificar $cfg (se deja sin cambios)"; rm -rf "$work"; return 1
+    fi
+    [ -f "$cfg.linuxera.bak" ] || cp -p "$cfg" "$cfg.linuxera.bak"
+    cat "$work/b.cfg" > "$cfg"
+    rm -rf "$work"
+}
+
+if [ "${1:-}" = "--user" ]; then
+    BASE="$HOME/.e/e/config"
+    ELM_BASE="$HOME/.elementary/config"
+    if pgrep -u "$(id -u)" -x enlightenment > /dev/null 2>&1; then
+        log "Enlightenment está en ejecución: cerrá la sesión y ejecutá 'linuxera-e-look --user' desde una TTY."
+        exit 1
+    fi
+else
+    [ "$(id -u)" -eq 0 ] || { log "Ejecutalo como root, o con --user para tu usuario."; exit 1; }
+    BASE="/usr/share/enlightenment/data/config"
+    ELM_BASE="/usr/share/elementary/config"
+fi
+
+rc=0
+
+# Perfiles de Enlightenment (iconos, fondo)
+if [ -d "$BASE" ]; then
+    n=0
+    while IFS= read -r -d '' cfg; do
+        n=$((n + 1))
+        if patch_cfg "$cfg"; then log "Aplicado: $cfg"; else rc=1; fi
+    done < <(find "$BASE" -mindepth 2 -maxdepth 2 -name e.cfg -print0)
+    [ "$n" -gt 0 ] || log "No se encontraron perfiles en $BASE."
+else
+    log "No existe $BASE; se omite."
+fi
+
+# Perfiles de Elementary (tema e iconos de Enlightenment, su menú, la barra y las apps EFL)
+if [ -d "$ELM_BASE" ]; then
+    n=0
+    while IFS= read -r -d '' cfg; do
+        n=$((n + 1))
+        if patch_elm_cfg "$cfg"; then log "Tema e iconos aplicados: $cfg"; else rc=1; fi
+    done < <(find "$ELM_BASE" -mindepth 2 -maxdepth 2 -name base.cfg -print0)
+    [ "$n" -gt 0 ] || log "No se encontraron perfiles en $ELM_BASE."
+else
+    log "No existe $ELM_BASE; se omite."
+fi
+
+# Atajos de teclado y mouse del lanzador Everything
+if [ -d "$BASE" ]; then
+    n=0
+    while IFS= read -r -d '' cfg; do
+        n=$((n + 1))
+        if patch_bindings "$cfg"; then log "Atajos de Everything aplicados: $cfg"; else rc=1; fi
+    done < <(find "$BASE" -mindepth 2 -maxdepth 2 -name e_bindings.cfg -print0)
+    [ "$n" -gt 0 ] || log "No se encontraron archivos e_bindings.cfg en $BASE."
+fi
+
+exit "$rc"
+HELPER_EOF
+sudo chmod 755 /usr/local/bin/linuxera-e-look
+
+echo "==> Instalando hook de pacman para conservar la apariencia tras actualizar Enlightenment..."
+sudo mkdir -p /etc/pacman.d/hooks
+sudo tee /etc/pacman.d/hooks/linuxera-e-look.hook > /dev/null << 'EOF'
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = enlightenment
+Target = efl
+
+[Action]
+Description = Aplicando tema, iconos y fondo de COMUNIDAD LINUXERA a Enlightenment y EFL...
+When = PostTransaction
+Exec = /usr/local/bin/linuxera-e-look
+EOF
+
+echo "==> Aplicando la apariencia a los perfiles de Enlightenment del sistema..."
+sudo /usr/local/bin/linuxera-e-look || echo "==> Aviso: no se pudo aplicar a todos los perfiles del sistema."
+
+# Si el usuario ya había iniciado Enlightenment antes, también actualizamos su configuración
+if [ -d "$USER_HOME/.e/e/config" ] || [ -d "$USER_HOME/.elementary/config" ]; then
+    echo "==> Aplicando la apariencia a la configuración existente de $REAL_USER..."
+    sudo -u "$REAL_USER" -H /usr/local/bin/linuxera-e-look --user \
+        || echo "==> Aviso: no se pudo aplicar a la configuración de $REAL_USER."
+    # Forzar que EFL regenere su caché de iconos con el tema nuevo
+    rm -rf "$USER_HOME/.cache/efreet"
+fi
+
+# ---------- 7.5 Iconos para aplicaciones GTK ----------
+echo "==> Configurando $ICON_THEME para aplicaciones GTK 3 y GTK 4..."
+REAL_GROUP=$(id -gn "$REAL_USER")
+for GTK_VER in 3.0 4.0; do
+    # Usuario actual
+    GTK_FILE="$USER_HOME/.config/gtk-$GTK_VER/settings.ini"
+    GTK_TMP=$(mktemp)
+    if [ -f "$GTK_FILE" ]; then cat "$GTK_FILE" > "$GTK_TMP"; fi
+    ini_set "$GTK_TMP" Settings gtk-icon-theme-name "$ICON_THEME"
+    sudo -u "$REAL_USER" mkdir -p "$(dirname "$GTK_FILE")"
+    sudo install -m644 -o "$REAL_USER" -g "$REAL_GROUP" "$GTK_TMP" "$GTK_FILE"
+
+    # Usuarios nuevos (/etc/skel)
+    SKEL_FILE="/etc/skel/.config/gtk-$GTK_VER/settings.ini"
+    : > "$GTK_TMP"
+    if [ -f "$SKEL_FILE" ]; then cat "$SKEL_FILE" > "$GTK_TMP"; fi
+    ini_set "$GTK_TMP" Settings gtk-icon-theme-name "$ICON_THEME"
+    sudo install -Dm644 "$GTK_TMP" "$SKEL_FILE"
+    rm -f "$GTK_TMP"
+done
+
+# ---------- 7.6 Pantalla de inicio de sesión (Slick Greeter) ----------
+echo "==> Aplicando fondo e iconos a la pantalla de inicio de sesión..."
+GREETER_CONF="/etc/lightdm/slick-greeter.conf"
+GREETER_TMP=$(mktemp)
+if [ -f "$GREETER_CONF" ]; then cat "$GREETER_CONF" > "$GREETER_TMP"; fi
+if [ -f "$WALLPAPER_PNG" ]; then
+    ini_set "$GREETER_TMP" Greeter background "$WALLPAPER_PNG"
+    ini_set "$GREETER_TMP" Greeter draw-user-backgrounds false
+fi
+ini_set "$GREETER_TMP" Greeter icon-theme-name "$ICON_THEME"
+sudo install -Dm644 "$GREETER_TMP" "$GREETER_CONF"
+rm -f "$GREETER_TMP"
+
+rm -rf "$LOOK_TMP"
+
+
+# ==========================================
+# 8. LIMPIEZA Y REINICIO
+# ==========================================
+# Nota: NO se redefine USER_HOME con $HOME. Con sudo, $HOME puede apuntar a
+# /root; usamos el USER_HOME calculado al inicio a partir de REAL_USER.
+
+echo "==> Eliminando dependencias huérfanas (p. ej. dependencias de compilación de yay)..."
+ORPHANS=$(pacman -Qdtq 2>/dev/null || true)
+if [ -n "$ORPHANS" ]; then
+    # shellcheck disable=SC2086
+    sudo pacman -Rns --noconfirm $ORPHANS || echo "==> Aviso: no se pudieron quitar algunos huérfanos, se continúa."
+else
+    echo "==> No hay paquetes huérfanos."
+fi
+
+echo "==> Limpiando caché de pacman (se conservan los paquetes instalados)..."
+sudo pacman -Sc --noconfirm >/dev/null || true
+
+echo "==> Limpiando caché de compilación de yay..."
+rm -rf "$USER_HOME/.cache/yay" 2>/dev/null || true
+
+SCRIPT_REPO_DIR="$USER_HOME/LinuxScripts"
+if [ -d "$SCRIPT_REPO_DIR" ]; then
+    echo "==> Limpiando carpeta del script ($SCRIPT_REPO_DIR)..."
+    # Salimos de la carpeta antes de borrarla, por si el script se ejecuta desde ahí
+    cd "$USER_HOME"
+    rm -rf "$SCRIPT_REPO_DIR"
+fi
+
+# Resumen final (coincide con lo que realmente instala este script)
+cat << 'EOF'
+======================================================
+ Instalación y configuración completadas con éxito.
+ Display manager:       LightDM + Slick Greeter
+ Entorno de escritorio: Enlightenment
+ Terminal:              Terminology
+ Tema:                  Dimensions (Enlightenment + Elementary)
+ Iconos:                Yaru-blue-dark (también en Enlightenment)
+ Fondo de pantalla:     archlinux-wallpapers 27.png
+ Lanzador Everything:   Ctrl+Espacio / clic derecho en el escritorio
+ Gestor de archivos:    EFM (integrado en Enlightenment)
+ Red:                   ConnMan
+ Gestores de paquetes:  pacman, yay, pamac
+ Repositorios activos:  kiro (nemesis_repo) + chaotic-aur
+
  SSSS   III   N   N  EEEEE  RRRR    GGG    III    AAA
 S        I    NN  N  E      R   R  G   G    I    A   A
 S        I    N N N  E      R   R  G        I    A   A
  SSS     I    N N N  EEEE   RRRR   G GGG    I    AAAAA
     S    I    N  NN  E      R R    G   G    I    A   A
     S    I    N   N  E      R  R   G   G    I    A   A
-SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A"
-echo "======================================================"
-echo "            COMUNIDAD    LINUXERA"
-echo "======================================================"
-read -t 15 -p "Reiniciar el sistema ahora? (s/N, auto-continúa en 15s): " respuesta || respuesta="s"
-case "$respuesta" in
-    [sS]|"")
-        echo "==> Reiniciando..."
-        sudo reboot
+SSSS    III   N   N  EEEEE  R   R   GGG    III   A   A
+======================================================
+            COMUNIDAD    LINUXERA
+======================================================
+EOF
+
+# Si no hay terminal interactiva (stdin redirigido), no reiniciamos solos
+if [ -t 0 ]; then
+    read -r -t 15 -p "¿Reiniciar el sistema ahora? (S/n, reinicia solo en 15s): " respuesta || respuesta="s"
+    echo
+else
+    respuesta="n"
+fi
+
+case "${respuesta,,}" in
+    s|si|sí|"")
+        echo "==> Sincronizando discos y reiniciando..."
+        sync
+        sudo systemctl reboot
         ;;
     *)
         echo "==> Reinicio cancelado. Recordá reiniciar manualmente para aplicar los cambios."
