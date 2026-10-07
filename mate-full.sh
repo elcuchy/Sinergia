@@ -212,7 +212,11 @@ cd ..
 rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin mate-menu sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
+yay -S stacer-bin sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
+
+# mate-menu (AUR) incluye por error gschemas.compiled y choca con el del sistema
+yay -S mate-menu --noconfirm --overwrite '*gschemas.compiled'
+sudo glib-compile-schemas /usr/share/glib-2.0/schemas/
 
 # ==========================================
 # 4.1 PERFILES DE PANEL PARA MATE-TWEAK
