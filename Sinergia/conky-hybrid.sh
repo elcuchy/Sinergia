@@ -222,6 +222,24 @@ EOF
         write_hybrid_autostart "$USER_HOME/.config" "$REAL_USER"
         write_hybrid_autostart "/etc/skel/.config" "root"
 
+                # Autostart específico de Trinity (TDE): usa ~/.trinity/Autostart
+        write_hybrid_tde_autostart() {
+            local HOME_DIR="$1"
+            local USER_NAME="$2"
+            sudo mkdir -p "$HOME_DIR/.trinity/Autostart"
+            sudo tee "$HOME_DIR/.trinity/Autostart/hybrid-conky.sh" > /dev/null << 'EOF'
+#!/bin/sh
+exec "$HOME/.config/conky/hybrid/startup/hybrid-startup.sh"
+EOF
+            sudo chmod +x "$HOME_DIR/.trinity/Autostart/hybrid-conky.sh"
+            if [ "$USER_NAME" != "root" ]; then
+                sudo chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.trinity"
+            fi
+        }
+
+        write_hybrid_tde_autostart "$USER_HOME" "$REAL_USER"
+        write_hybrid_tde_autostart "/etc/skel" "root"
+
         echo "==> Tema Conky Hybrid instalado y configurado para iniciar en cada login."
     else
         echo "==> Advertencia: no se pudo descomprimir el tema Conky Hybrid."
