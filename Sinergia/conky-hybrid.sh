@@ -1,26 +1,13 @@
 #!/bin/bash
 # ==========================================================
 #  TEMA CONKY HYBRID (ESCALA DE GRISES) - MULTI-ESCRITORIO
-#  Arch Linux: MATE, XFCE, GNOME, KDE, Cinnamon, LXQt, Budgie,
-#  Enlightenment, Trinity (TDE), Fluxbox, IceWM, Openbox,
-#  i3, sway, bspwm y gestores de ventanas sueltos.
+#  Instalador universal para Arch Linux.
 #
-#  Cambios respecto a la versión anterior:
-#   - La detección de interfaces de red y de CPUs ya NO se hornea
-#     en la instalación: se hace en cada login (sirve si clonas
-#     el disco a otro equipo).
-#   - El conteo de CPUs usa /proc/stat (igual que Conky).
-#   - Un único lanzador /usr/local/bin/hybrid-conky-start, con
-#     bloqueo (flock) para que nunca arranque dos veces.
-#   - Autostart XDG (MATE/XFCE/GNOME/KDE/Cinnamon/LXQt/Budgie),
-#     autostart propio de Trinity, Enlightenment, Fluxbox,
-#     IceWM, Openbox, i3, sway y bspwm.
-#   - Dependencias comprobadas (python, yay/paru, Cairo/Lua en conky).
-#   - Ya NO se debe ejecutar como root: usa sudo internamente.
-#   - Detección de Cairo/Lua más robusta (con respaldo vía strings).
-#   - Sustitución de conky por conky-lua-nv más segura (sin -Rdd
-#     a la ligera).
-#   - Aviso si la sesión es Wayland (Conky va vía XWayland).
+#  USO:
+#      cd /ruta/al/tema/hybrid
+#      ./install.sh
+#
+#  NO ejecutar con sudo. El script pedirá sudo cuando lo necesite.
 # ==========================================================
 
 set -uo pipefail
@@ -28,7 +15,14 @@ set -uo pipefail
 # ---------- Seguridad: no ejecutar como root ----------
 if [ "$(id -u)" -eq 0 ]; then
     echo "==> ERROR: ejecuta este script SIN sudo. Él pedirá sudo cuando lo necesite."
-    echo "    (Si lo lanzas con sudo, yay/paru y \$HOME se comportan raro.)"
+    exit 1
+fi
+
+# ---------- Localizar el directorio del tema ----------
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ ! -f "$SCRIPT_DIR/hybrid.conf" ] || [ ! -d "$SCRIPT_DIR/lua" ]; then
+    echo "==> ERROR: ejecuta este script desde el directorio raíz del tema Hybrid."
+    echo "    Se esperaban: hybrid.conf y lua/ en $SCRIPT_DIR"
     exit 1
 fi
 
@@ -39,7 +33,6 @@ USER_HOME="${USER_HOME:-$(getent passwd "$REAL_USER" | cut -d: -f6)}"
 [ -d "$USER_HOME" ] || USER_HOME=$(eval echo "~$REAL_USER")
 : "${USER_HOME:?No se pudo determinar USER_HOME}"
 
-# Aviso Wayland (informativo, no bloquea)
 if [ "${XDG_SESSION_TYPE:-x11}" = "wayland" ]; then
     echo "==> Wayland detectado: Conky se ejecutará a través de XWayland."
 fi
@@ -50,7 +43,6 @@ sudo pacman -S --needed --noconfirm python unzip util-linux iproute2 noto-fonts 
 conky_has_cairo() {
     command -v conky >/dev/null 2>&1 || return 1
     conky --version 2>/dev/null | grep -qiE 'cairo|lua' && return 0
-    # Respaldo: buscar símbolos de Cairo en el binario
     strings "$(command -v conky)" 2>/dev/null | grep -qi 'cairo' && return 0
     return 1
 }
@@ -66,60 +58,44 @@ if ! conky_has_cairo; then
         command -v "$h" >/dev/null 2>&1 && AUR_HELPER="$h" && break
     done
     if [ -n "$AUR_HELPER" ]; then
-        # Intento normal primero; -Rdd solo como último recurso y avisando.
         if ! sudo pacman -R --noconfirm conky 2>/dev/null; then
             echo "==> ADVERTENCIA: 'pacman -R conky' falló; forzando con -Rdd."
-            echo "    Revisa dependencias rotas con 'pacman -Qtdq' tras la instalación."
             sudo pacman -Rdd --noconfirm conky 2>/dev/null || true
         fi
         "$AUR_HELPER" -S --needed --noconfirm conky-lua-nv
     else
-        echo "==> ADVERTENCIA: no hay yay ni paru; instala conky-lua-nv a mano"
-        echo "    o los anillos no se dibujarán."
+        echo "==> ADVERTENCIA: no hay yay ni paru; instala conky-lua-nv a mano."
     fi
 fi
 conky_has_cairo || echo "==> ADVERTENCIA: conky sigue sin soporte Cairo."
 
-# ---------- Tema embebido (base64 de un .zip) ----------
-HYBRID_B64_FILE="/tmp/hybrid_theme.b64"
-HYBRID_ZIP="/tmp/hybrid.zip"
-HYBRID_EXTRACT_DIR="/tmp/hybrid_extract"
+# ---------- Preparar el árbol de instalación (con plantillas) ----------
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
 
-cat > "$HYBRID_B64_FILE" << 'HYBRID_B64_EOF'
-__BLOB__
-HYBRID_B64_EOF
+T="$WORK_DIR/hybrid"
+mkdir -p "$T"
+rsync -a \
+    --exclude='.git' \
+    --exclude='deploy.sh' \
+    --exclude='install.sh' \
+    --exclude='readme.md' \
+    --exclude='screenshots' \
+    --exclude='bad-experiment' \
+    --exclude='classic' \
+    "$SCRIPT_DIR/" "$T/"
 
-hybrid_install_main() {
-    base64 -d "$HYBRID_B64_FILE" > "$HYBRID_ZIP" 2>/dev/null
-    rm -f "$HYBRID_B64_FILE"
+# Los archivos que dependen de la máquina pasan a ser plantillas;
+# el lanzador los genera en cada login.
+mv "$T/hybrid.conf" "$T/hybrid.conf.tpl"
+mv "$T/lua/hybrid-rings.lua" "$T/lua/hybrid-rings.lua.tpl"
+rm -f "$T/startup/hybrid-startup.sh"
+mkdir -p "$T/startup"
 
-    if [ ! -s "$HYBRID_ZIP" ]; then
-        echo "==> ERROR: no se pudo decodificar el tema Conky Hybrid embebido."
-        return 1
-    fi
-
-    rm -rf "$HYBRID_EXTRACT_DIR"
-    mkdir -p "$HYBRID_EXTRACT_DIR"
-    if ! unzip -o -q "$HYBRID_ZIP" -d "$HYBRID_EXTRACT_DIR"; then
-        echo "==> ERROR: no se pudo descomprimir el tema Conky Hybrid."
-        return 1
-    fi
-
-    local T="$HYBRID_EXTRACT_DIR/hybrid"
-
-    # Los archivos que dependen de la máquina pasan a ser plantillas;
-    # el lanzador los genera en cada login.
-    mv "$T/hybrid.conf" "$T/hybrid.conf.tpl"
-    mv "$T/lua/hybrid-rings.lua" "$T/lua/hybrid-rings.lua.tpl"
-    rm -f "$T/startup/hybrid-startup.sh"
-    mkdir -p "$T/startup"
-
-    # --- Recorte de anillos de CPU (se ejecuta en cada login) ---
-    cat > "$T/startup/hybrid-prepare.py" << 'HYBRID_PY_EOF'
+# --- Recorte de anillos de CPU (se ejecuta en cada login) ---
+cat > "$T/startup/hybrid-prepare.py" << 'HYBRID_PY_EOF'
 #!/usr/bin/env python3
 # Genera lua/hybrid-rings.lua quitando los anillos cpuN que no existen.
-# Conky aborta ("attempting to use more CPUs than you have") si se
-# pide un CPU inexistente. Se cuenta con la misma fuente que Conky.
 import os, re, sys
 
 d = sys.argv[1]
@@ -168,36 +144,35 @@ text = re.sub(r"(\n[ \t]*){3,}", "\n\n", text)
 with open(dst, "w", encoding="utf-8") as f:
     f.write(text)
 HYBRID_PY_EOF
+chmod +x "$T/startup/hybrid-prepare.py"
 
-    # --- Despliegue en el usuario real y en /etc/skel ---
-    hybrid_deploy() {
-        local HOME_DIR="$1" USER_NAME="$2"
-        sudo mkdir -p "$HOME_DIR/.config/conky"
-        sudo rm -rf "$HOME_DIR/.config/conky/hybrid"
-        sudo cp -r "$T" "$HOME_DIR/.config/conky/hybrid"
-        if [ "$USER_NAME" != "root" ]; then
-            sudo chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.config/conky"
-        fi
-    }
-    hybrid_deploy "$USER_HOME" "$REAL_USER"
-    hybrid_deploy "/etc/skel" "root"
-
-    # --- Fuentes (NotoSans ya instalada vía pacman) ---
-    if compgen -G "$T/fonts/*.ttf" > /dev/null; then
-        sudo mkdir -p /usr/share/fonts/hybrid-conky
-        sudo cp "$T/fonts/"*.ttf /usr/share/fonts/hybrid-conky/
-        sudo fc-cache -f > /dev/null 2>&1
+# ---------- Despliegue en el usuario real y en /etc/skel ----------
+hybrid_deploy() {
+    local HOME_DIR="$1" USER_NAME="$2"
+    sudo mkdir -p "$HOME_DIR/.config/conky"
+    sudo rm -rf "$HOME_DIR/.config/conky/hybrid"
+    sudo cp -r "$T" "$HOME_DIR/.config/conky/hybrid"
+    if [ "$USER_NAME" != "root" ]; then
+        sudo chown -R "$USER_NAME:$USER_NAME" "$HOME_DIR/.config/conky"
     fi
+}
+hybrid_deploy "$USER_HOME" "$REAL_USER"
+hybrid_deploy "/etc/skel" "root"
 
-    # --- Lanzador único ---
-    sudo tee /usr/local/bin/hybrid-conky-start > /dev/null << 'HYBRID_LAUNCHER_EOF'
+# ---------- Fuentes ----------
+if compgen -G "$T/fonts/*.ttf" > /dev/null; then
+    sudo mkdir -p /usr/share/fonts/hybrid-conky
+    sudo cp "$T/fonts/"*.ttf /usr/share/fonts/hybrid-conky/
+    sudo fc-cache -f > /dev/null 2>&1
+fi
+
+# ---------- Lanzador único ----------
+sudo tee /usr/local/bin/hybrid-conky-start > /dev/null << 'HYBRID_LAUNCHER_EOF'
 #!/bin/sh
 # Lanzador del tema Conky Hybrid. Idempotente y apto para cualquier escritorio.
 D="$HOME/.config/conky/hybrid"
 [ -f "$D/hybrid.conf.tpl" ] || exit 0
 
-# Bloqueo: si ya hay una instancia (p.ej. XDG + TDE a la vez), salir.
-# El descriptor 9 lo hereda conky, así que el bloqueo dura lo que dure conky.
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/hybrid-conky-$(id -u).lock"
 exec 9>"$LOCK"
 flock -n 9 || exit 0
@@ -227,20 +202,18 @@ else
     cp "$D/lua/hybrid-rings.lua.tpl" "$D/lua/hybrid-rings.lua"
 fi
 
-# Espera a que el escritorio/compositor esté listo
 sleep "${HYBRID_DELAY:-5}"
 exec conky -c "$D/hybrid.conf"
 HYBRID_LAUNCHER_EOF
-    sudo chmod 755 /usr/local/bin/hybrid-conky-start
+sudo chmod 755 /usr/local/bin/hybrid-conky-start
 
-    # --- Autostart: XDG (casi todos) + Trinity + Enlightenment + WMs ---
-    hybrid_autostart() {
-        local HOME_DIR="$1" USER_NAME="$2"
+# ---------- Autostart multi-escritorio ----------
+hybrid_autostart() {
+    local HOME_DIR="$1" USER_NAME="$2"
 
-        # ---------- XDG autostart ----------
-        # Cubre: MATE, XFCE, GNOME, KDE, Cinnamon, LXQt, Budgie.
-        sudo mkdir -p "$HOME_DIR/.config/autostart"
-        sudo tee "$HOME_DIR/.config/autostart/hybrid-conky.desktop" > /dev/null << 'HYBRID_DESKTOP_EOF'
+    # XDG (MATE, XFCE, GNOME, KDE, Cinnamon, LXQt, Budgie)
+    sudo mkdir -p "$HOME_DIR/.config/autostart"
+    sudo tee "$HOME_DIR/.config/autostart/hybrid-conky.desktop" > /dev/null << 'HYBRID_DESKTOP_EOF'
 [Desktop Entry]
 Type=Application
 Exec=/usr/local/bin/hybrid-conky-start
@@ -251,67 +224,64 @@ Name=Hybrid Conky
 Comment=Inicia el tema Conky Hybrid (escala de grises) al iniciar sesión
 HYBRID_DESKTOP_EOF
 
-        # ---------- Trinity (TDE) ----------
-        sudo mkdir -p "$HOME_DIR/.trinity/Autostart"
-        sudo tee "$HOME_DIR/.trinity/Autostart/hybrid-conky.sh" > /dev/null << 'HYBRID_TDE_EOF'
+    # Trinity (TDE)
+    sudo mkdir -p "$HOME_DIR/.trinity/Autostart"
+    sudo tee "$HOME_DIR/.trinity/Autostart/hybrid-conky.sh" > /dev/null << 'HYBRID_TDE_EOF'
 #!/bin/sh
 exec /usr/local/bin/hybrid-conky-start
 HYBRID_TDE_EOF
-        sudo chmod +x "$HOME_DIR/.trinity/Autostart/hybrid-conky.sh"
+    sudo chmod +x "$HOME_DIR/.trinity/Autostart/hybrid-conky.sh"
 
-        # ---------- Enlightenment ----------
-        sudo mkdir -p "$HOME_DIR/.e/e/applications/startup"
-        echo "hybrid-conky-start" | sudo tee "$HOME_DIR/.e/e/applications/startup/.order" >/dev/null
+    # Enlightenment
+    sudo mkdir -p "$HOME_DIR/.e/e/applications/startup"
+    echo "hybrid-conky-start" | sudo tee "$HOME_DIR/.e/e/applications/startup/.order" >/dev/null
 
-        # ---------- Fluxbox ----------
-        if [ -d "$HOME_DIR/.fluxbox" ]; then
-            if ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.fluxbox/startup" 2>/dev/null; then
-                echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.fluxbox/startup" >/dev/null
-            fi
+    # Fluxbox
+    if [ -d "$HOME_DIR/.fluxbox" ]; then
+        if ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.fluxbox/startup" 2>/dev/null; then
+            echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.fluxbox/startup" >/dev/null
         fi
+    fi
 
-        # ---------- IceWM ----------
-        if [ -d "$HOME_DIR/.icewm" ]; then
-            if ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.icewm/startup" 2>/dev/null; then
-                echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.icewm/startup" >/dev/null
-            fi
+    # IceWM
+    if [ -d "$HOME_DIR/.icewm" ]; then
+        if ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.icewm/startup" 2>/dev/null; then
+            echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.icewm/startup" >/dev/null
         fi
+    fi
 
-        # ---------- Openbox ----------
-        if [ -d "$HOME_DIR/.config/openbox" ]; then
-            if ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.config/openbox/autostart" 2>/dev/null; then
-                echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.config/openbox/autostart" >/dev/null
-            fi
+    # Openbox
+    if [ -d "$HOME_DIR/.config/openbox" ]; then
+        if ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.config/openbox/autostart" 2>/dev/null; then
+            echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.config/openbox/autostart" >/dev/null
         fi
+    fi
 
-        # ---------- i3 / sway ----------
-        for wm_cfg in "$HOME_DIR/.config/i3/config" "$HOME_DIR/.config/sway/config"; do
-            if [ -f "$wm_cfg" ] && ! sudo grep -q 'hybrid-conky-start' "$wm_cfg"; then
-                echo 'exec_always --no-startup-id /usr/local/bin/hybrid-conky-start' | sudo tee -a "$wm_cfg" >/dev/null
-            fi
-        done
-
-        # ---------- bspwm ----------
-        if [ -f "$HOME_DIR/.config/bspwm/bspwmrc" ] && \
-           ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.config/bspwm/bspwmrc"; then
-            echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.config/bspwm/bspwmrc" >/dev/null
+    # i3 / sway
+    for wm_cfg in "$HOME_DIR/.config/i3/config" "$HOME_DIR/.config/sway/config"; do
+        if [ -f "$wm_cfg" ] && ! sudo grep -q 'hybrid-conky-start' "$wm_cfg"; then
+            echo 'exec_always --no-startup-id /usr/local/bin/hybrid-conky-start' | sudo tee -a "$wm_cfg" >/dev/null
         fi
+    done
 
-        # ---------- Permisos ----------
-        if [ "$USER_NAME" != "root" ]; then
-            sudo chown -R "$USER_NAME:$USER_NAME" \
-                "$HOME_DIR/.config/autostart" \
-                "$HOME_DIR/.trinity" \
-                "$HOME_DIR/.e" 2>/dev/null || true
-        fi
-    }
-    hybrid_autostart "$USER_HOME" "$REAL_USER"
-    hybrid_autostart "/etc/skel" "root"
+    # bspwm
+    if [ -f "$HOME_DIR/.config/bspwm/bspwmrc" ] && \
+       ! sudo grep -q 'hybrid-conky-start' "$HOME_DIR/.config/bspwm/bspwmrc"; then
+        echo '/usr/local/bin/hybrid-conky-start &' | sudo tee -a "$HOME_DIR/.config/bspwm/bspwmrc" >/dev/null
+    fi
 
-    echo "==> Tema Conky Hybrid instalado. Se configura solo en cada login."
-    echo "==> Si usas dwm, JWM, WindowMaker u otro WM sin autostart estándar,"
-    echo "    añade a mano a su config:  hybrid-conky-start &"
+    if [ "$USER_NAME" != "root" ]; then
+        sudo chown -R "$USER_NAME:$USER_NAME" \
+            "$HOME_DIR/.config/autostart" \
+            "$HOME_DIR/.trinity" \
+            "$HOME_DIR/.e" 2>/dev/null || true
+    fi
 }
+hybrid_autostart "$USER_HOME" "$REAL_USER"
+hybrid_autostart "/etc/skel" "root"
 
-hybrid_install_main
-rm -rf "$HYBRID_EXTRACT_DIR" "$HYBRID_ZIP" "$HYBRID_B64_FILE"
+echo "==> Tema Conky Hybrid instalado correctamente."
+echo "==> Se lanzará automáticamente en el próximo login."
+echo "==> Para probarlo ahora:  hybrid-conky-start &"
+echo "==> Si usas dwm, JWM o WindowMaker, añade a mano a su config:"
+echo "      /usr/local/bin/hybrid-conky-start &"
