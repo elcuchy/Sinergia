@@ -1,16 +1,27 @@
 #!/bin/bash
 # ==========================================================
-#  TEMA CONKY HYBRID (ESCALA DE GRISES) - MULTI-ESCRITORIO
-#  Instalador universal para Arch Linux.
+#  TEMA CONKY HYBRID (ESCALA DE GRISES) - INSTALADOR UNIVERSAL
+#  Arch Linux · Multi-escritorio
+#
+#  Descarga el tema desde Bitbucket, instala dependencias,
+#  despliega el lanzador y configura el autostart en:
+#    MATE, XFCE, GNOME, KDE, Cinnamon, LXQt, Budgie,
+#    Trinity (TDE), Enlightenment, Fluxbox, IceWM,
+#    Openbox, i3, sway y bspwm.
 #
 #  USO:
-#      cd /ruta/al/tema/hybrid
-#      ./install.sh
+#      chmod +x install.sh
+#      ./install.sh              # instala
+#      ./install.sh --uninstall  # desinstala
 #
 #  NO ejecutar con sudo. El script pedirá sudo cuando lo necesite.
 # ==========================================================
 
 set -uo pipefail
+
+HYBRID_REPO="https://bitbucket.org/dirn-typo/hybrid"
+HYBRID_TARBALL="${HYBRID_REPO}/get/master.tar.gz"
+LAUNCHER="/usr/local/bin/hybrid-conky-start"
 
 # ---------- Seguridad: no ejecutar como root ----------
 if [ "$(id -u)" -eq 0 ]; then
@@ -18,12 +29,41 @@ if [ "$(id -u)" -eq 0 ]; then
     exit 1
 fi
 
-# ---------- Localizar el directorio del tema ----------
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-if [ ! -f "$SCRIPT_DIR/hybrid.conf" ] || [ ! -d "$SCRIPT_DIR/lua" ]; then
-    echo "==> ERROR: ejecuta este script desde el directorio raíz del tema Hybrid."
-    echo "    Se esperaban: hybrid.conf y lua/ en $SCRIPT_DIR"
-    exit 1
+# ---------- Modo desinstalación ----------
+if [ "${1:-}" = "--uninstall" ]; then
+    echo "==> Desinstalando el tema Conky Hybrid..."
+    pkill -f "conky -c $HOME/.config/conky/hybrid" 2>/dev/null || true
+
+    # Autostart XDG
+    rm -f "$HOME/.config/autostart/hybrid-conky.desktop"
+    # Trinity
+    rm -f "$HOME/.trinity/Autostart/hybrid-conky.sh"
+    # Enlightenment
+    if [ -f "$HOME/.e/e/applications/startup/.order" ]; then
+        sed -i '/hybrid-conky-start/d' "$HOME/.e/e/applications/startup/.order"
+    fi
+    # Fluxbox / IceWM / Openbox / bspwm (eliminar la línea)
+    for f in \
+        "$HOME/.fluxbox/startup" \
+        "$HOME/.icewm/startup" \
+        "$HOME/.config/openbox/autostart" \
+        "$HOME/.config/bspwm/bspwmrc"
+    do
+        [ -f "$f" ] && sed -i '/hybrid-conky-start/d' "$f"
+    done
+    # i3 / sway
+    for f in "$HOME/.config/i3/config" "$HOME/.config/sway/config"; do
+        [ -f "$f" ] && sed -i '/hybrid-conky-start/d' "$f"
+    done
+
+    # Config, lanzador y fuentes
+    rm -rf "$HOME/.config/conky/hybrid"
+    sudo rm -f "$LAUNCHER"
+    sudo rm -rf /usr/share/fonts/hybrid-conky
+    sudo fc-cache -f >/dev/null 2>&1 || true
+
+    echo "==> Desinstalación completada."
+    exit 0
 fi
 
 echo "==> Instalando el tema Conky Hybrid (multi-escritorio)..."
@@ -37,9 +77,12 @@ if [ "${XDG_SESSION_TYPE:-x11}" = "wayland" ]; then
     echo "==> Wayland detectado: Conky se ejecutará a través de XWayland."
 fi
 
-# ---------- Dependencias ----------
-sudo pacman -S --needed --noconfirm python unzip util-linux iproute2 noto-fonts fontconfig
+# ---------- Dependencias base ----------
+echo "==> Instalando dependencias base..."
+sudo pacman -S --needed --noconfirm \
+    python unzip tar curl rsync util-linux iproute2 noto-fonts fontconfig
 
+# ---------- Conky con Cairo/Lua ----------
 conky_has_cairo() {
     command -v conky >/dev/null 2>&1 || return 1
     conky --version 2>/dev/null | grep -qiE 'cairo|lua' && return 0
@@ -69,11 +112,42 @@ if ! conky_has_cairo; then
 fi
 conky_has_cairo || echo "==> ADVERTENCIA: conky sigue sin soporte Cairo."
 
-# ---------- Preparar el árbol de instalación (con plantillas) ----------
+# ---------- Descarga del tema desde Bitbucket ----------
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-T="$WORK_DIR/hybrid"
+echo "==> Descargando el tema desde Bitbucket..."
+if ! curl -fL --retry 3 --connect-timeout 15 \
+        -o "$WORK_DIR/hybrid.tar.gz" "$HYBRID_TARBALL"; then
+    echo "==> ERROR: no se pudo descargar el tema."
+    echo "    Comprueba tu conexión o descarga manualmente:"
+    echo "      $HYBRID_TARBALL"
+    echo "    y colócalo como $PWD/hybrid.tar.gz y vuelve a ejecutar."
+    exit 1
+fi
+
+tar -xzf "$WORK_DIR/hybrid.tar.gz" -C "$WORK_DIR" || {
+    echo "==> ERROR: el archivo descargado no es un tar.gz válido."
+    exit 1
+}
+
+# Bitbucket extrae en dirn-typo-hybrid-<hash>/ (nombre variable)
+SRC_DIR="$(find "$WORK_DIR" -maxdepth 1 -mindepth 1 -type d -name 'dirn-typo-hybrid-*' | head -n1)"
+[ -n "$SRC_DIR" ] || {
+    echo "==> ERROR: no se encontró el directorio del tema tras descomprimir."
+    ls -la "$WORK_DIR"
+    exit 1
+}
+
+[ -f "$SRC_DIR/hybrid.conf" ] || {
+    echo "==> ERROR: no se encontró hybrid.conf en $SRC_DIR"
+    echo "    Contenido del directorio:"
+    ls -la "$SRC_DIR"
+    exit 1
+}
+
+# ---------- Preparar plantillas ----------
+T="$WORK_DIR/theme"
 mkdir -p "$T"
 rsync -a \
     --exclude='.git' \
@@ -83,16 +157,18 @@ rsync -a \
     --exclude='screenshots' \
     --exclude='bad-experiment' \
     --exclude='classic' \
-    "$SCRIPT_DIR/" "$T/"
+    --exclude='images' \
+    "$SRC_DIR/" "$T/"
 
-# Los archivos que dependen de la máquina pasan a ser plantillas;
-# el lanzador los genera en cada login.
+# Renombrar a plantillas (se generan en cada login)
 mv "$T/hybrid.conf" "$T/hybrid.conf.tpl"
-mv "$T/lua/hybrid-rings.lua" "$T/lua/hybrid-rings.lua.tpl"
+if [ -f "$T/lua/hybrid-rings.lua" ]; then
+    mv "$T/lua/hybrid-rings.lua" "$T/lua/hybrid-rings.lua.tpl"
+fi
 rm -f "$T/startup/hybrid-startup.sh"
 mkdir -p "$T/startup"
 
-# --- Recorte de anillos de CPU (se ejecuta en cada login) ---
+# ---------- Script de preparación (recorte de anillos de CPU) ----------
 cat > "$T/startup/hybrid-prepare.py" << 'HYBRID_PY_EOF'
 #!/usr/bin/env python3
 # Genera lua/hybrid-rings.lua quitando los anillos cpuN que no existen.
@@ -102,11 +178,19 @@ d = sys.argv[1]
 src = os.path.join(d, "lua", "hybrid-rings.lua.tpl")
 dst = os.path.join(d, "lua", "hybrid-rings.lua")
 
+if not os.path.isfile(src):
+    sys.exit(0)  # sin plantilla no hay nada que hacer
+
 with open("/proc/stat") as f:
     nproc = max(sum(1 for l in f if re.match(r"cpu\d+\s", l)), 1)
 
 with open(src, "r", encoding="utf-8") as f:
     text = f.read()
+
+if "settings_table" not in text:
+    with open(dst, "w", encoding="utf-8") as f:
+        f.write(text)
+    sys.exit(0)
 
 marker = "settings_table = {"
 tbl_start = text.index(marker)
@@ -146,7 +230,7 @@ with open(dst, "w", encoding="utf-8") as f:
 HYBRID_PY_EOF
 chmod +x "$T/startup/hybrid-prepare.py"
 
-# ---------- Despliegue en el usuario real y en /etc/skel ----------
+# ---------- Despliegue ----------
 hybrid_deploy() {
     local HOME_DIR="$1" USER_NAME="$2"
     sudo mkdir -p "$HOME_DIR/.config/conky"
@@ -161,15 +245,16 @@ hybrid_deploy "/etc/skel" "root"
 
 # ---------- Fuentes ----------
 if compgen -G "$T/fonts/*.ttf" > /dev/null; then
+    echo "==> Instalando fuentes..."
     sudo mkdir -p /usr/share/fonts/hybrid-conky
     sudo cp "$T/fonts/"*.ttf /usr/share/fonts/hybrid-conky/
     sudo fc-cache -f > /dev/null 2>&1
 fi
 
 # ---------- Lanzador único ----------
-sudo tee /usr/local/bin/hybrid-conky-start > /dev/null << 'HYBRID_LAUNCHER_EOF'
+sudo tee "$LAUNCHER" > /dev/null << 'HYBRID_LAUNCHER_EOF'
 #!/bin/sh
-# Lanzador del tema Conky Hybrid. Idempotente y apto para cualquier escritorio.
+# Lanzador del tema Conky Hybrid. Idempotente, apto para cualquier escritorio.
 D="$HOME/.config/conky/hybrid"
 [ -f "$D/hybrid.conf.tpl" ] || exit 0
 
@@ -197,15 +282,18 @@ sed -e "s/__IFACE_WIRED1__/$WIRED/g" \
     "$D/hybrid.conf.tpl" > "$D/hybrid.conf"
 
 if command -v python3 >/dev/null 2>&1; then
-    python3 "$D/startup/hybrid-prepare.py" "$D" || cp "$D/lua/hybrid-rings.lua.tpl" "$D/lua/hybrid-rings.lua"
+    python3 "$D/startup/hybrid-prepare.py" "$D" || \
+        [ -f "$D/lua/hybrid-rings.lua.tpl" ] && \
+        cp "$D/lua/hybrid-rings.lua.tpl" "$D/lua/hybrid-rings.lua"
 else
-    cp "$D/lua/hybrid-rings.lua.tpl" "$D/lua/hybrid-rings.lua"
+    [ -f "$D/lua/hybrid-rings.lua.tpl" ] && \
+        cp "$D/lua/hybrid-rings.lua.tpl" "$D/lua/hybrid-rings.lua"
 fi
 
 sleep "${HYBRID_DELAY:-5}"
 exec conky -c "$D/hybrid.conf"
 HYBRID_LAUNCHER_EOF
-sudo chmod 755 /usr/local/bin/hybrid-conky-start
+sudo chmod 755 "$LAUNCHER"
 
 # ---------- Autostart multi-escritorio ----------
 hybrid_autostart() {
@@ -280,8 +368,9 @@ HYBRID_TDE_EOF
 hybrid_autostart "$USER_HOME" "$REAL_USER"
 hybrid_autostart "/etc/skel" "root"
 
+echo ""
 echo "==> Tema Conky Hybrid instalado correctamente."
 echo "==> Se lanzará automáticamente en el próximo login."
-echo "==> Para probarlo ahora:  hybrid-conky-start &"
-echo "==> Si usas dwm, JWM o WindowMaker, añade a mano a su config:"
-echo "      /usr/local/bin/hybrid-conky-start &"
+echo "==> Para probarlo ahora:   hybrid-conky-start &"
+echo "==> Para desinstalarlo:    ./install.sh --uninstall"
+echo ""
