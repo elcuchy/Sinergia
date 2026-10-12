@@ -179,6 +179,7 @@ sudo pacman -S --noconfirm \
   tde-twin-style-mallory \
   tde-twin-style-suse2 \
   tde-yakuake \
+  conky \
   os-prober
 
 # ==========================================
