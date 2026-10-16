@@ -232,6 +232,7 @@ sudo pacman -S --noconfirm --needed \
   sinergia-dd-burner \
   sinergia-appimage-manager \
   sinergia-reflector-top \
+  sinergia-keyring \
   yay \
   os-prober
 
