@@ -92,10 +92,35 @@ fi
 
 sudo pacman -Sy
 
+# ==========================================
+# 2. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# ==========================================
+echo "==> Configurando el repositorio Chaotic-AUR..."
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443 || \
+{ sleep 5; sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com; }
+sudo pacman-key --lsign-key 3056513887B78AEB
+
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF'
+fi
+
+echo "==> Actualizando la base de datos de repositorios..."
+sudo pacman -Sy
 
 # ==========================================
-# 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
+# 3. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
 # ==========================================
+
 echo "==> Configurando el repositorio nemesis_repo..."
 
 # Aseguramos que el keyring de pacman esté inicializado antes de importar claves
@@ -125,31 +150,6 @@ sudo pacman -Sy --needed kiro-keyring kiro-mirrorlist --noconfirm
 echo "==> Actualizando pacman.conf para usar kiro-mirrorlist..."
 sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /etc/pacman.d/kiro-mirrorlist|g' /etc/pacman.conf
 
-
-# ==========================================
-# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
-# ==========================================
-echo "==> Configurando el repositorio Chaotic-AUR..."
-
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443 || \
-{ sleep 5; sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com; }
-sudo pacman-key --lsign-key 3056513887B78AEB
-
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
-
-if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-    echo "==> Agregando [chaotic-aur] a pacman.conf..."
-    sudo bash -c 'cat << EOF >> /etc/pacman.conf
-
-[chaotic-aur]
-Include = /etc/pacman.d/chaotic-mirrorlist
-EOF'
-fi
-
-echo "==> Actualizando la base de datos de repositorios..."
-sudo pacman -Sy
 
 # ==========================================
 # 3.1 CONFIGURACIÓN DEL REPOSITORIO SINERGIA
