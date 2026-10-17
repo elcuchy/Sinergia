@@ -1,9 +1,9 @@
-gia#!/bin/bash
+#!/bin/bash
 
 # --- CONFIGURACIÓN DE TUS SCRIPTS DE GITHUB ---
-URL_SCRIPT_1="https://github.com/SinergiaLinux/LinuxScripts/blob/main/Arch/Daro/Gnome/gnome-sinergia.sh"
-URL_SCRIPT_2="https://github.com/SinergiaLinux/LinuxScripts/blob/main/Arch/Daro/Gnome/gnome-full.sh"
-URL_SCRIPT_3="https://github.com/SinergiaLinux/LinuxScripts/blob/main/Arch/Daro/Gnome/gnome-monochrome.sh"
+URL_SCRIPT_1="https://raw.githubusercontent.com/SinergiaLinux/LinuxScripts/refs/heads/main/Arch/Daro/Gnome/gnome-sinergia.sh"
+URL_SCRIPT_2="https://raw.githubusercontent.com/SinergiaLinux/LinuxScripts/refs/heads/main/Arch/Daro/Gnome/gnome-full.sh"
+URL_SCRIPT_3="https://raw.githubusercontent.com/SinergiaLinux/LinuxScripts/refs/heads/main/Arch/Daro/Gnome/gnome-monochrome.sh"
 
 # Colores para la terminal
 VERDE='\033[0;32m'
