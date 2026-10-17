@@ -1,4 +1,4 @@
-#!/bin/bash
+gia#!/bin/bash
 
 # --- CONFIGURACIÓN DE TUS SCRIPTS DE GITHUB ---
 URL_SCRIPT_1="https://github.com/SinergiaLinux/LinuxScripts/blob/main/Arch/Daro/Gnome/gnome-sinergia.sh"
@@ -45,7 +45,7 @@ check_deps
 PS3="Selecciona una opción para instalar GNOME (1-3) o 4 para salir: "
 
 # El comando select crea el menú automáticamente
-select opcion in "Instalar GNOME Versión A" "Instalar GNOME Versión B" "Instalar GNOME Versión C" "Salir"; do
+select opcion in "Instalar GNOME Versión Sinergia" "Instalar GNOME Versión Full" "Instalar GNOME Versión Monochrome" "Salir"; do
     case $REPLY in
         1)
             ejecutar_script "$URL_SCRIPT_1" "GNOME Versión Sinergia"
