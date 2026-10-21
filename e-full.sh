@@ -178,6 +178,7 @@ sudo pacman -S --noconfirm --needed \
   sinergia-appimage-manager \
   sinergia-reflector-top \
   sinergia-keyring \
+  yay \
   os-prober
 
 
@@ -187,19 +188,6 @@ sudo pacman -S --noconfirm --needed \
 echo "==> Asegurando base-devel e instalando YAY..."
 sudo pacman -S --needed base-devel git --noconfirm
 
-if command -v yay >/dev/null 2>&1; then
-    echo "==> yay ya está instalado, se omite la compilación."
-else
-    BUILD_DIR=$(mktemp -d)
-    sudo chown -R "$REAL_USER:$REAL_USER" "$BUILD_DIR"
-
-    sudo -u "$REAL_USER" bash -c "
-      git clone https://aur.archlinux.org/yay.git '$BUILD_DIR/yay'
-      cd '$BUILD_DIR/yay'
-      makepkg -si --noconfirm
-    "
-    rm -rf "$BUILD_DIR"
-fi
 
 echo "==> Instalando paquetes AUR adicionales..."
 sudo -u "$REAL_USER" yay -S --needed --noconfirm \
