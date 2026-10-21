@@ -21,16 +21,16 @@ URL_XFCE_2="https://raw.githubusercontent.com/SinergiaLinux/LinuxScripts/refs/he
 URL_XFCE_3="https://raw.githubusercontent.com/SinergiaLinux/LinuxScripts/refs/heads/main/Arch/Daro/Xfce/xfce-monochrome.sh"
 
 # --- URLs de Trinity ---
-URL_TRINITY_1="https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/trinity-variante1.sh"
-URL_TRINITY_2="https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/trinity-variante2.sh"
+URL_TRINITY_1="https://raw.githubusercontent.com/elcuchy/Sinergia/refs/heads/main/trinity-sinergia.sh"
+URL_TRINITY_2="https://raw.githubusercontent.com/elcuchy/Sinergia/refs/heads/main/trinity-full.sh"
 
 # --- URLs de Enlightenment ---
-URL_ENLIGHTENMENT_1="https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/enlightenment-variante1.sh"
-URL_ENLIGHTENMENT_2="https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/enlightenment-variante2.sh"
+URL_ENLIGHTENMENT_1="https://raw.githubusercontent.com/elcuchy/Sinergia/refs/heads/main/e-sinergia.sh"
+URL_ENLIGHTENMENT_2="https://raw.githubusercontent.com/elcuchy/Sinergia/refs/heads/main/e-full.sh"
 
 # --- URLs de MATE ---
-URL_MATE_1="https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/mate-variante1.sh"
-URL_MATE_2="https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/mate-variante2.sh"
+URL_MATE_1="https://raw.githubusercontent.com/elcuchy/Sinergia/refs/heads/main/mate-sinergia.sh"
+URL_MATE_2="https://raw.githubusercontent.com/elcuchy/Sinergia/refs/heads/main/mate-full.sh"
 
 # ==========================================
 # COLORES Y FUNCIONES BASE
@@ -132,6 +132,59 @@ menu_xfce() {
     done
 }
 
+# --- NUEVOS MENÚS ---
+
+menu_trinity() {
+    while true; do
+        echo -e "\n${AZUL}--- MENÚ DE TRINITY ---${NC}"
+        echo "1) Instalar Trinity Sinergia"
+        echo "2) Instalar Trinity Full"
+        echo "3) Volver al menú principal"
+        read -p "Selecciona una opción (1-3): " opcion_trinity
+
+        case $opcion_trinity in
+            1) ejecutar_script "$URL_TRINITY_1" "Trinity Sinergia" ;;
+            2) ejecutar_script "$URL_TRINITY_2" "Trinity Full" ;;
+            3) break ;;
+            *) echo -e "${ROJO}Opción no válida.${NC}" ;;
+        esac
+    done
+}
+
+menu_enlightenment() {
+    while true; do
+        echo -e "\n${AZUL}--- MENÚ DE ENLIGHTENMENT ---${NC}"
+        echo "1) Instalar Enlightenment Sinergia"
+        echo "2) Instalar Enlightenment Full"
+        echo "3) Volver al menú principal"
+        read -p "Selecciona una opción (1-3): " opcion_enlightenment
+
+        case $opcion_enlightenment in
+            1) ejecutar_script "$URL_ENLIGHTENMENT_1" "Enlightenment Sinergia" ;;
+            2) ejecutar_script "$URL_ENLIGHTENMENT_2" "Enlightenment Full" ;;
+            3) break ;;
+            *) echo -e "${ROJO}Opción no válida.${NC}" ;;
+        esac
+    done
+}
+
+menu_mate() {
+    while true; do
+        echo -e "\n${AZUL}--- MENÚ DE MATE ---${NC}"
+        echo "1) Instalar MATE Sinergia"
+        echo "2) Instalar MATE Full"
+        echo "3) Volver al menú principal"
+        read -p "Selecciona una opción (1-3): " opcion_mate
+
+        case $opcion_mate in
+            1) ejecutar_script "$URL_MATE_1" "MATE Sinergia" ;;
+            2) ejecutar_script "$URL_MATE_2" "MATE Full" ;;
+            3) break ;;
+            *) echo -e "${ROJO}Opción no válida.${NC}" ;;
+        esac
+    done
+}
+
 # ==========================================
 # MENÚ PRINCIPAL
 # ==========================================
@@ -140,22 +193,30 @@ menu_xfce() {
 check_deps
 
 while true; do
-    echo -e "\n${VERDE}=== INSTALADOR DE ENTORNOS DE ESCRITORIO ==="
-    echo -e "===          ARCH LINUX                    ===${NC}"
+    echo -e "\n${VERDE}=============================================="
+    echo -e "=== INSTALADOR DE ENTORNOS DE ESCRITORIO  ==="
+    echo -e "===              ARCH LINUX                ==="
+    echo -e "==============================================${NC}"
     echo "1) Gestionar instalación de GNOME"
     echo "2) Gestionar instalación de Plasma (KDE)"
     echo "3) Gestionar instalación de XFCE"
-    echo "4) Salir"
-    read -p "Selecciona un entorno (1-4): " opcion_principal
+    echo "4) Gestionar instalación de Trinity"
+    echo "5) Gestionar instalación de Enlightenment"
+    echo "6) Gestionar instalación de MATE"
+    echo "7) Salir"
+    read -p "Selecciona un entorno (1-7): " opcion_principal
 
     case $opcion_principal in
         1) menu_gnome ;;
         2) menu_plasma ;;
         3) menu_xfce ;;
-        4) 
+        4) menu_trinity ;;
+        5) menu_enlightenment ;;
+        6) menu_mate ;;
+        7) 
             echo -e "${VERDE}Saliendo del instalador. ¡Hasta luego!${NC}"
             exit 0 
             ;;
-        *) echo -e "${ROJO}Opción no válida. Por favor, elige del 1 al 4.${NC}" ;;
+        *) echo -e "${ROJO}Opción no válida. Por favor, elige del 1 al 7.${NC}" ;;
     esac
 done
