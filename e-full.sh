@@ -29,9 +29,33 @@ elif ! grep -q "^ParallelDownloads" /etc/pacman.conf; then
     sudo sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 fi
 
+# ==========================================
+# 2. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# ==========================================
+echo "==> Configurando el repositorio Chaotic-AUR..."
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443 || \
+{ sleep 5; sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com; }
+sudo pacman-key --lsign-key 3056513887B78AEB
+
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF'
+fi
+
+echo "==> Actualizando la base de datos de repositorios..."
+sudo pacman -Sy
 
 # ==========================================
-# 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
+# 3. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
 # ==========================================
 echo "==> Configurando el repositorio nemesis_repo..."
 
@@ -64,24 +88,20 @@ sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /et
 
 
 # ==========================================
-# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# 3.1 CONFIGURACIÓN DEL REPOSITORIO SINERGIA
 # ==========================================
-echo "==> Configurando el repositorio Chaotic-AUR..."
+echo "==> Configurando el repositorio sinergia..."
 
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443 || \
-{ sleep 5; sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com; }
-sudo pacman-key --lsign-key 3056513887B78AEB
+# Importar la clave GPG del repositorio y firmarla localmente
+curl -fsSL https://Nacho-Telmo.github.io/sinergia-repo/x86_64/sinergia.gpg | sudo pacman-key --add -
+sudo pacman-key --lsign-key 4CBFA5A14BB153A7
 
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
-
-if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+if ! grep -q "^\[sinergia\]" /etc/pacman.conf; then
+    echo "==> Agregando [sinergia] a pacman.conf..."
     sudo bash -c 'cat << EOF >> /etc/pacman.conf
 
-[chaotic-aur]
-Include = /etc/pacman.d/chaotic-mirrorlist
+[sinergia]
+Server = https://Nacho-Telmo.github.io/sinergia-repo/\$arch
 EOF'
 fi
 
@@ -153,6 +173,11 @@ sudo pacman -S --noconfirm --needed \
   mint-y-icons \
   mate-icon-theme-faenza \
   rustdesk-bin \
+  stacer-bin \
+  sinergia-dd-burner \
+  sinergia-appimage-manager \
+  sinergia-reflector-top \
+  sinergia-keyring \
   os-prober
 
 
@@ -178,8 +203,7 @@ fi
 
 echo "==> Instalando paquetes AUR adicionales..."
 sudo -u "$REAL_USER" yay -S --needed --noconfirm \
-  stacer-bin \
-  sinergia-dd-burner \
+  
   iptvnator-bin \
   yaru-colors-icon-theme \
   fetch-git
