@@ -56,9 +56,38 @@ fi
 
 sudo pacman -Sy
 
+# ==========================================
+# 2. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# ==========================================
+echo "==> Configurando el repositorio Chaotic-AUR..."
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
+sudo pacman-key --lsign-key 3056513887B78AEB
+
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+
+if [ ! -f /etc/pacman.d/chaotic-mirrorlist ]; then
+    echo "==> ERROR: chaotic-mirrorlist no se instaló (probable falla de red temporal)."
+    echo "    No se va a tocar pacman.conf para evitar dejarlo roto. Corré el script de nuevo."
+    exit 1
+fi
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF'
+fi
+
+echo "==> Actualizando la base de datos de repositorios..."
+sudo pacman -Sy
 
 # ==========================================
-# 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
+# 3. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
 # ==========================================
 echo "==> Configurando el repositorio nemesis_repo..."
 
@@ -91,36 +120,27 @@ fi
 echo "==> Actualizando pacman.conf para usar kiro-mirrorlist..."
 sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /etc/pacman.d/kiro-mirrorlist|g' /etc/pacman.conf
 
-
 # ==========================================
-# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# 3.1 CONFIGURACIÓN DEL REPOSITORIO SINERGIA
 # ==========================================
-echo "==> Configurando el repositorio Chaotic-AUR..."
+echo "==> Configurando el repositorio sinergia..."
 
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
-sudo pacman-key --lsign-key 3056513887B78AEB
+# Importar la clave GPG del repositorio y firmarla localmente
+curl -fsSL https://Nacho-Telmo.github.io/sinergia-repo/x86_64/sinergia.gpg | sudo pacman-key --add -
+sudo pacman-key --lsign-key 4CBFA5A14BB153A7
 
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
-
-if [ ! -f /etc/pacman.d/chaotic-mirrorlist ]; then
-    echo "==> ERROR: chaotic-mirrorlist no se instaló (probable falla de red temporal)."
-    echo "    No se va a tocar pacman.conf para evitar dejarlo roto. Corré el script de nuevo."
-    exit 1
-fi
-
-if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+if ! grep -q "^\[sinergia\]" /etc/pacman.conf; then
+    echo "==> Agregando [sinergia] a pacman.conf..."
     sudo bash -c 'cat << EOF >> /etc/pacman.conf
 
-[chaotic-aur]
-Include = /etc/pacman.d/chaotic-mirrorlist
+[sinergia]
+Server = https://Nacho-Telmo.github.io/sinergia-repo/\$arch
 EOF'
 fi
 
 echo "==> Actualizando la base de datos de repositorios..."
 sudo pacman -Sy
+
 
 
 # Exit on error (si un comando falla, el script se detiene por seguridad)
@@ -196,6 +216,12 @@ sudo pacman -S --noconfirm \
   ttf-monofur \
   xfce4-screenshooter \
   gnome-boxes \
+  stacer-bin \
+  sinergia-dd-burner \
+  sinergia-appimage-manager \
+  sinergia-reflector-top \
+  sinergia-keyring \
+  yay \
   os-prober
 
 # ==========================================
@@ -204,15 +230,9 @@ sudo pacman -S --noconfirm \
 echo "==> Asegurando base-devel e instalando YAY..."
 sudo pacman -S --needed base-devel git --noconfirm
 
-rm -rf yay
-git clone https://aur.archlinux.org/yay.git
-cd yay || exit
-makepkg -si --noconfirm
-cd ..
-rm -rf yay
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
+yay -S iptvnator-bin yaru-colors-icon-theme fetch-git --noconfirm
 
 # mate-menu (AUR) incluye por error gschemas.compiled y choca con el del sistema
 yay -S mate-menu --noconfirm --overwrite '*gschemas.compiled'
