@@ -42,9 +42,47 @@ fi
 
 sudo pacman -Sy
 
+# ==========================================
+# 1.2 CONFIGURACIÓN DEL REPOSITORIO TRINITY DESKTOP
+# ==========================================
+
+if ! grep -q "\[trinity\]" /etc/pacman.conf; then
+  echo "Añadiendo el repositorio [trinity] a /etc/pacman.conf..."
+  sudo bash -c 'cat <<EOF >> /etc/pacman.conf
+
+[trinity]
+Server = https://mirror.ppa.trinitydesktop.org/trinity/archlinux/\$arch
+EOF'
+fi
+
+# 2. Recibir y firmar la llave GPG
+sudo pacman-key --recv-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
+sudo pacman-key --lsign-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
+
 
 # ==========================================
-# 2. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
+# 2. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# ==========================================
+echo "==> Configurando el repositorio Chaotic-AUR..."
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
+sudo pacman-key --lsign-key 3056513887B78AEB
+
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+    sudo bash -c 'cat << EOF >> /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF'
+fi
+
+# ==========================================
+# 3. CONFIGURACIÓN DEL REPOSITORIO NEMESIS_REPO (KIRO)
 # ==========================================
 echo "==> Configurando el repositorio nemesis_repo..."
 
@@ -73,23 +111,20 @@ sudo sed -i 's|Server = https://erikdubois.github.io/\$repo/\$arch|Include = /et
 
 
 # ==========================================
-# 3. CONFIGURACIÓN DEL REPOSITORIO CHAOTIC-AUR
+# 3.1 CONFIGURACIÓN DEL REPOSITORIO SINERGIA
 # ==========================================
-echo "==> Configurando el repositorio Chaotic-AUR..."
+echo "==> Configurando el repositorio sinergia..."
 
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com || \
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver hkps://keyserver.ubuntu.com:443
-sudo pacman-key --lsign-key 3056513887B78AEB
+# Importar la clave GPG del repositorio y firmarla localmente
+curl -fsSL https://Nacho-Telmo.github.io/sinergia-repo/x86_64/sinergia.gpg | sudo pacman-key --add -
+sudo pacman-key --lsign-key 4CBFA5A14BB153A7
 
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
-
-if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-    echo "==> Agregando [chaotic-aur] a pacman.conf..."
+if ! grep -q "^\[sinergia\]" /etc/pacman.conf; then
+    echo "==> Agregando [sinergia] a pacman.conf..."
     sudo bash -c 'cat << EOF >> /etc/pacman.conf
 
-[chaotic-aur]
-Include = /etc/pacman.d/chaotic-mirrorlist
+[sinergia]
+Server = https://Nacho-Telmo.github.io/sinergia-repo/\$arch
 EOF'
 fi
 
@@ -97,29 +132,11 @@ echo "==> Actualizando la base de datos de repositorios..."
 sudo pacman -Sy
 
 
+
 # Exit on error (si un comando falla, el script se detiene por seguridad)
 set -e
 
-# ==========================================
-# 4. REPOSITORIO E INSTALACIÓN DE TRINITY DESKTOP (TDE)
-# ==========================================
 
-# 4.1 Agregar el repositorio de Trinity Desktop (si no existe ya en pacman.conf)
-if ! grep -q "\[trinity\]" /etc/pacman.conf; then
-  echo "Añadiendo el repositorio [trinity] a /etc/pacman.conf..."
-  sudo bash -c 'cat <<EOF >> /etc/pacman.conf
-
-[trinity]
-Server = https://mirror.ppa.trinitydesktop.org/trinity/archlinux/\$arch
-EOF'
-fi
-
-# 4.2 Recibir y firmar la llave GPG
-sudo pacman-key --recv-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
-sudo pacman-key --lsign-key D6D6FAA25E9A3E4ECD9FBDBEC93AF1698685AD8B
-
-# 4.3 Actualizar las bases de datos de repositorios
-sudo pacman -Sy --noconfirm
 
 # 4.4 Instalar TDE y el resto de los paquetes
 #     (librsvg se usa más abajo para convertir el logo de Arch a PNG)
@@ -179,6 +196,12 @@ sudo pacman -S --noconfirm \
   tde-twin-style-mallory \
   tde-twin-style-suse2 \
   tde-yakuake \
+  stacer-bin \
+  sinergia-dd-burner \
+  sinergia-appimage-manager \
+  sinergia-reflector-top \
+  sinergia-keyring \
+  yay \
   os-prober
 
 # ==========================================
@@ -187,15 +210,10 @@ sudo pacman -S --noconfirm \
 echo "==> Asegurando base-devel e instalando YAY..."
 sudo pacman -S --needed base-devel git --noconfirm
 
-rm -rf yay
-git clone https://aur.archlinux.org/yay.git
-cd yay || exit
-makepkg -si --noconfirm
-cd ..
-rm -rf yay
+
 
 echo "==> Instalando paquetes adicionales..."
-yay -S stacer-bin sinergia-dd-burner iptvnator-bin --noconfirm
+yay -S iptvnator-bin --noconfirm
 
 # ==========================================
 # 6. CONFIGURACIONES DE TRINITY DESKTOP (TDE)
